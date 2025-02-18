@@ -21,7 +21,7 @@ namespace Xpetra {
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 MapExtractor<Scalar, LocalOrdinal, GlobalOrdinal, Node>::
     MapExtractor(const RCP<const Map>& fullmap, const std::vector<RCP<const Map>>& maps, bool bThyraMode) {
-  map_ = Teuchos::rcp(new BlockedMap(fullmap, maps, bThyraMode));
+  map_ = Teuchos::rcp(new BlockedMap(fullmap, maps, bThyraMode));//##########
 }
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>

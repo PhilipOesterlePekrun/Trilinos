@@ -50,7 +50,7 @@ void TopRAPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::DeclareInput(Leve
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 void TopRAPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& /* fineLevel */, Level& coarseLevel) const {
   if ((PFact_ != Teuchos::null) && (PFact_ != NoFactory::getRCP())) {
-    RCP<Operator> oP = coarseLevel.Get<RCP<Operator> >("P", PFact_.get());
+    RCP<Operator> oP = coarseLevel.Get<RCP<Operator> >("P", PFact_.get());//##########
     // Don't have a valid operator (e.g., # global aggregates is 0) so we just bail out
     // This level will ultimately be removed in MueLu_Hierarchy_defs.h via a resize()j
     if (oP == Teuchos::null) return;

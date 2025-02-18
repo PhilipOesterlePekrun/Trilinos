@@ -74,6 +74,12 @@ void FactoryManager<Scalar, LocalOrdinal, GlobalOrdinal, Node>::SetFactory(const
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 const RCP<const FactoryBase> FactoryManager<Scalar, LocalOrdinal, GlobalOrdinal, Node>::GetFactory(const std::string& varName) const {
+  std::cout << "FactoryManager, line 77: factoryTable_ Keys:" << std::endl;
+  /*for (const auto& entry : factoryTable_) {
+      std::cout << entry.first << std::endl;  // Print the key (string)
+  }*/
+
+
   if (factoryTable_.count(varName)) {
     // Search user provided factories
     return factoryTable_.find(varName)->second;

@@ -37,13 +37,15 @@ BlockedMap<LocalOrdinal, GlobalOrdinal, Node>::
     size_t numAllElements = 0;
     for (size_t v = 0; v < maps.size(); ++v) {
       numAllElements += maps[v]->getGlobalNumElements();
+      std::cout<<"\n========Xpetra_BlockedMap_def, line 40====== v = "<<v<<", maps[v]->getGlobalNumElements() = "<<maps[v]->getGlobalNumElements()<<"\n";
     }
+    std::cout<<"\n=========fullmap->getGlobalNumElements() = "<<fullmap->getGlobalNumElements()<<"\n";
     TEUCHOS_TEST_FOR_EXCEPTION(fullmap->getGlobalNumElements() != numAllElements,
                                std::logic_error,
                                "logic error. full map and sub maps have not same number of elements ("
                                    << fullmap->getGlobalNumElements() << " versus " << numAllElements
                                    << "). We cannot build MapExtractor with Xpetra-style numbering. Please make sure that you want "
-                                      "Xpetra-style numbering instead of Thyra-style numbering.");
+                                      "Xpetra-style numbering instead of Thyra-style numbering.");//###############################################
 
     fullmap_ = fullmap;
     maps_    = maps;

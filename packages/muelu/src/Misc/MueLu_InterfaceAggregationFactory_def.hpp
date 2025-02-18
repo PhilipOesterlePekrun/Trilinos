@@ -22,6 +22,8 @@
 
 #include "MueLu_InterfaceAggregationFactory_decl.hpp"
 
+#include "MueLu_FactoryManagerBase.hpp"//#
+
 namespace MueLu {
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
@@ -30,6 +32,8 @@ RCP<const ParameterList> InterfaceAggregationFactory<Scalar, LocalOrdinal, Globa
 
   validParamList->set<RCP<const FactoryBase>>("A", Teuchos::null, "Generating factory of A (matrix block related to dual DOFs)");
   validParamList->set<RCP<const FactoryBase>>("Aggregates", Teuchos::null, "Generating factory of the Aggregates (for block 0,0)");
+  ////validParamList->set<RCP<const FactoryBase>>("primalAggregates", Teuchos::null, "Generating factory of the Aggregates (for block 0,0)");//#
+  std::cout<<"GetValidParameterList\n";
 
   validParamList->set<std::string>("Dual/primal mapping strategy", "vague",
                                    "Strategy to represent mapping between dual and primal quantities [node-based, dof-based]");
@@ -42,6 +46,12 @@ RCP<const ParameterList> InterfaceAggregationFactory<Scalar, LocalOrdinal, Globa
   validParamList->set<RCP<const FactoryBase>>("Primal interface DOF map", Teuchos::null,
                                               "Generating factory of the primal DOF row map of slave side of the coupling surface");
 
+  validParamList->setEntry("A: name", Teuchos::ParameterEntry(std::string("")));
+  validParamList->setEntry("A: factory", Teuchos::ParameterEntry(std::string("")));
+  //validParamList->setEntry("A: name", Teuchos::null, "A01 fact");
+  //validParamList->set<std::string>("A: factory", "", "fact A01");
+  //validParamList->set<RCP<const FactoryBase>>("A: factory", Teuchos::null, "A01 fact");
+
   return validParamList;
 }  // GetValidParameterList()
 
@@ -49,18 +59,38 @@ template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::DeclareInput(Level &currentLevel) const {
   Input(currentLevel, "A");  // matrix block of dual variables
   Input(currentLevel, "Aggregates");
+  ////Input(currentLevel, "primalAggregates");//#
+  std::cout<<"DeclareInput start\n";
 
   const ParameterList &pL = GetParameterList();
   TEUCHOS_TEST_FOR_EXCEPTION(pL.get<std::string>("Dual/primal mapping strategy") == "vague", Exceptions::InvalidArgument,
                              "Strategy for dual/primal mapping not selected. Please select one of the available strategies.")
   if (pL.get<std::string>("Dual/primal mapping strategy") == "node-based") {
+    const std::string AFactName = pL.get<std::string>("A: factory");
+    const std::string AName     = pL.get<std::string>("A: name");
+
+
+    TEUCHOS_TEST_FOR_EXCEPTION(!currentLevel.IsAvailable("DualNodeID2PrimalNodeID", NoFactory::get()),
+                                 Exceptions::RuntimeError, "==========AFact_ not available!!!!!!!!");
+    //Input(currentLevel, "A: factory");
+    //AFact_ = currentLevel.GetFactoryManager()->GetFactory("A: factory");
+    //currentLevel.DeclareInput(AName, AFact_.get(), this);
+
     if (currentLevel.GetLevelID() == 0) {
       TEUCHOS_TEST_FOR_EXCEPTION(!currentLevel.IsAvailable("DualNodeID2PrimalNodeID", NoFactory::get()),
                                  Exceptions::RuntimeError, "DualNodeID2PrimalNodeID was not provided by the user on level 0!");
 
       currentLevel.DeclareInput("DualNodeID2PrimalNodeID", NoFactory::get(), this);
+
+
+      // Not needed, if the A is provided as user data
+      //currentLevel.DeclareInput(AName, NoFactory::get(), this);
+      
     } else {
       Input(currentLevel, "DualNodeID2PrimalNodeID");
+
+      //AFact_ = currentLevel.GetFactoryManager()->GetFactory(AFactName);
+      //currentLevel.DeclareInput(AName, AFact_.get(), this);
     }
   } else if (pL.get<std::string>("Dual/primal mapping strategy") == "dof-based") {
     if (currentLevel.GetLevelID() == 0)
@@ -70,10 +100,13 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Dec
   } else
     TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::InvalidArgument, "Unknown strategy for dual/primal mapping.")
 
+    std::cout<<"DeclareInput end\n";
 }  // DeclareInput
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level &currentLevel) const {
+  std::cout<<"InterfaceAggregationFactory::Build() start\n";
+
   const std::string prefix = "MueLu::InterfaceAggregationFactory::Build: ";
 
   FactoryMonitor m(*this, "Build", currentLevel);
@@ -88,23 +121,77 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   else
     TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::InvalidArgument,
                                "MueLu::InterfaceAggregationFactory::Builld(): Unknown strategy for dual/primal mapping. Set a valid value for the parameter \"" << parameterName << "\".")
+
+  std::cout<<"InterfaceAggregationFactory::Build() end\n";
 }
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
-void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::BuildBasedOnNodeMapping(const std::string &prefix,
-                                                                                                     Level &currentLevel) const {
+void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::BuildBasedOnNodeMapping(const std::string &prefix, Level &currentLevel) const {
+
+
+
+
+const GlobalOrdinal dualDofOffset = 384;//#
+Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
+  std::cout<<"interfaceAgg start\n\n";
+  std::cout<<"============ currentLevel="<<currentLevel.GetLevelID()<<"\n";
   using Dual2Primal_type = std::map<LocalOrdinal, LocalOrdinal>;
-
+  std::cout<<"we get interfaceAgg 97\n";
   const ParameterList &pL = GetParameterList();
+  std::cout<<"we get interfaceAgg 99\n";
+  RCP<const Matrix> A01                   = Get<RCP<Matrix>>(currentLevel, "A");
+  /*RCP<Matrix> Ain = Get<RCP<Matrix> >(currentLevel, "A");
+  RCP<BlockedCrsMatrix> AinBlocked = rcp_dynamic_cast<BlockedCrsMatrix>(Ain);
+  RCP<const Matrix> A01 = AinBlocked->getMatrix(0, 1);*/
 
-  RCP<const Matrix> A                   = Get<RCP<Matrix>>(currentLevel, "A");
+
+  ////std::string AName   = pL.get<std::string>("A: name");
+  //RCP<const Matrix> A01                   = Get<RCP<Matrix>>(currentLevel, AName);
+  /////RCP<const Matrix> A01=currentLevel.Get<RCP<Matrix>>(AName, AFact_.get());
+  //RCP<const Matrix> A01=currentLevel.Get<RCP<Matrix>>("A: Factory", this->GetFactory("A: Factory").get());
+
+  //const RCP<const Matrix> A01                   = currentLevel.Get<RCP<Matrix>>("A", AFact_.get());//#maybe need to dereference or not
+  const RCP<const Matrix> A                   = currentLevel.Get<RCP<Matrix>>("A", AFact_.get());//#maybe need to 
+
+  //RCP<const Matrix> A01 = rcp_const_cast<const Matrix>(currentLevel.Get<RCP<const Matrix>>("A", AFact_.get()));//#wtf they are switch im so confused
+  //RCP<const Matrix> A01                   = Get<RCP<Matrix>>(currentLevel, "A");
+  //const RCP<const Matrix> A                   = currentLevel.Get<RCP<Matrix>>("A", AFact_.get());
+
+
+  std::cout << " Matrix Info A:\n";
+  std::cout << "  Global Rows: " << A->getGlobalNumRows() << "\n";
+  std::cout << "  Global Cols: " << A->getGlobalNumCols() << "\n";
+  std::cout << "  Global Nonzeros: " << A->getGlobalNumEntries() << "\n";
+  std::cout << "  Local Rows: " << A->getLocalNumRows() << "\n";
+  std::cout << "  Local Nonzeros: " << A->getLocalNumEntries() << "\n";
+
+  
+
+
+
+  
+
+  std::cout << " Matrix Info A01:\n";
+  std::cout << "  Global Rows: " << A01->getGlobalNumRows() << "\n";
+  std::cout << "  Global Cols: " << A01->getGlobalNumCols() << "\n";
+  std::cout << "  Global Nonzeros: " << A01->getGlobalNumEntries() << "\n";
+  std::cout << "  Local Rows: " << A01->getLocalNumRows() << "\n";
+  std::cout << "  Local Nonzeros: " << A01->getLocalNumEntries() << "\n";
+
+
+
+  std::cout<<"we get interfaceAgg 101\n";
   const LocalOrdinal numDofsPerDualNode = pL.get<LocalOrdinal>("number of DOFs per dual node");
+  std::cout<<"we get interfaceAgg 103\n";
   TEUCHOS_TEST_FOR_EXCEPTION(numDofsPerDualNode < Teuchos::ScalarTraits<LocalOrdinal>::one(), Exceptions::InvalidArgument,
                              "Number of dual DOFs per node < 0 (default value). Specify a valid \"number of DOFs per dual node\" in the parameter list for the InterfaceAggregationFactory.");
-
-  RCP<const Aggregates> primalAggregates          = Get<RCP<Aggregates>>(currentLevel, "Aggregates");
+  std::cout<<"we get interfaceAgg 106\n";
+  
+  RCP<const Aggregates> primalAggregates = Get<RCP<Aggregates>>(currentLevel, "Aggregates");
+  ///RCP<const Aggregates> primalAggregates = Get<RCP<Aggregates>>(currentLevel, "primalAggregates");
+  std::cout<<"we get interfaceAgg 108\n";
   ArrayRCP<const LocalOrdinal> primalVertex2AggId = primalAggregates->GetVertex2AggId()->getData(0);
-
+  std::cout<<"we get interfaceAgg 110\n";
   // Get the user-prescribed mapping of dual to primal node IDs
   RCP<Dual2Primal_type> mapNodesDualToPrimal;
   if (currentLevel.GetLevelID() == 0)
@@ -115,8 +202,32 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   RCP<const Map> operatorRangeMap = A->getRangeMap();
   const size_t myRank             = operatorRangeMap->getComm()->getRank();
 
+  std::cout<<"line 205: operatorRangeMap:\n";
+  operatorRangeMap->describe(*fos, Teuchos::VERB_EXTREME);
+
+  RCP<const Map> operatorRangeMapA01 = A01->getRangeMap();//#
+
+  std::cout<<"line 210: operatorRangeMapA01:\n";
+  operatorRangeMapA01->describe(*fos, Teuchos::VERB_EXTREME);
+
+  std::cout<<"operatorRangeMap->getLocalNumElements() = "<<operatorRangeMap->getLocalNumElements()<<"\n";
+  std::cout<<"operatorRangeMapA01->getLocalNumElements() = "<<operatorRangeMapA01->getLocalNumElements()<<"\n";
+  
+
+  
+
+  if(myRank==0){
+    std::cout<<"\nnode based: primalAggregates.PrintAllNodesPerAggregate:\n\ntrue:\n";
+    primalAggregates->PrintAllNodesPerAggregate(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), true);//use global node ids
+    //std::cout<<"\nfalse:\n";
+    //primalAggregates->PrintAllNodesPerAggregate(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), false);//dont use global node ids (so i guess local)
+  }
+
+
   LocalOrdinal globalNumDualNodes = operatorRangeMap->getGlobalNumElements() / numDofsPerDualNode;
   LocalOrdinal localNumDualNodes  = operatorRangeMap->getLocalNumElements() / numDofsPerDualNode;
+
+  std::cout<<"myRank= "<<myRank<<"\n\tlocalNumDualNodes = "<<localNumDualNodes<<"\n\tTeuchos::as<LocalOrdinal>(mapNodesDualToPrimal->size() = "<<Teuchos::as<LocalOrdinal>(mapNodesDualToPrimal->size())<<"\n\n";
 
   TEUCHOS_TEST_FOR_EXCEPTION(localNumDualNodes != Teuchos::as<LocalOrdinal>(mapNodesDualToPrimal->size()),
                              std::runtime_error, prefix << " MueLu requires the range map and the DualNodeID2PrimalNodeID map to be compatible.");
@@ -128,12 +239,39 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
     GlobalOrdinal indexBase                = operatorRangeMap->getIndexBase();
     auto comm                              = operatorRangeMap->getComm();
     std::vector<GlobalOrdinal> myDualNodes = {};
+    std::cout<<"line 221: dualDofOffset = "<<dualDofOffset<<"\n";
+    //for (size_t i = 0; i < operatorRangeMapA01->getLocalNumElements(); i++){
+    for (size_t i = 0; i < A01->getDomainMap()->getLocalNumElements(); i++){
+      ///myDualNodes.push_back((operatorRangeMap->getGlobalElement(i) - indexBase) / numDofsPerDualNode + indexBase);
+      GlobalOrdinal gDualDofId  = A01->getDomainMap()->getGlobalElement(i);
+      std::cout<<"gDualDofId = "<<gDualDofId<<"\n";
+      GlobalOrdinal gDualNodeId = AmalgamationFactory::DOFGid2NodeId(gDualDofId, numDofsPerDualNode, dualDofOffset, 0);
+      std::cout<<"gDualNodeId = "<<gDualNodeId<<"\n";
+      myDualNodes.push_back(gDualNodeId);
+      ////std::cout<<"(operatorRangeMap->getGlobalElement(i) - indexBase) / numDofsPerDualNode + indexBase = "<<(operatorRangeMap->getGlobalElement(i) - indexBase) / numDofsPerDualNode + indexBase<<"\n";
+    }
+    
+    // remove all duplicates
+    myDualNodes.erase(std::unique(myDualNodes.begin(), myDualNodes.end()), myDualNodes.end());
 
-    for (size_t i = 0; i < operatorRangeMap->getLocalNumElements(); i += numDofsPerDualNode)
-      myDualNodes.push_back((operatorRangeMap->getGlobalElement(i) - indexBase) / numDofsPerDualNode + indexBase);
+    std::cout<<"myDualNodes=dualNodes=\n";
+    for (const auto& node : myDualNodes) {
+      std::cout << node << " ";
+    }
+    std::cout << std::endl;
 
-    dualNodeMap = MapFactory::Build(operatorRangeMap->lib(), globalNumDualNodes, myDualNodes, indexBase, comm);
+    std::cout<<"indexBase = "<<indexBase<<"\n";
+
+    //dualNodeMap = MapFactory::Build(operatorRangeMap->lib(), globalNumDualNodes, myDualNodes, indexBase, comm);
+    dualNodeMap = MapFactory::Build(operatorRangeMapA01->lib(), Teuchos::OrdinalTraits<Xpetra::global_size_t>::invalid(), myDualNodes, indexBase, comm);
+    ///dualNodeMap = MapFactory::Build(operatorRangeMap->lib(), Teuchos::OrdinalTraits<Xpetra::global_size_t>::invalid(), myDualNodes, indexBase, comm);
+
+    //dualNodeMapA01 = MapFactory::Build(operatorRangeMapA01->lib(), Teuchos::OrdinalTraits<Xpetra::global_size_t>::invalid(), myDualNodes, indexBase, comm);
   }
+  
+  std::cout<<"line 223: dualNodeMap:\n";
+  dualNodeMap->describe(*fos, Teuchos::VERB_EXTREME);
+
   TEUCHOS_TEST_FOR_EXCEPTION(localNumDualNodes != Teuchos::as<LocalOrdinal>(dualNodeMap->getLocalNumElements()),
                              std::runtime_error, prefix << " Local number of dual nodes given by user is incompatible to the dual node map.");
 
@@ -150,6 +288,14 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   RCP<Dual2Primal_type> coarseMapNodesPrimalToDual = rcp(new Dual2Primal_type());
 
   LocalOrdinal numLocalDualAggregates = 0;
+
+  std::cout << "\ninterfaceAgg 170: mapNodesDualToPrimal in interfaceAgg on rank="<<myRank<<":\n";
+  if (!mapNodesDualToPrimal || mapNodesDualToPrimal->empty()) {
+    std::cout << "Map is empty or null." << std::endl;
+  }
+  for (const auto& pair : *mapNodesDualToPrimal) {
+    std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
+  }
 
   /* Loop over the local dual nodes and
    *
@@ -179,30 +325,123 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
     dualProcWinner[localDualNodeID]   = myRank;
   }
 
+  // Set dualAmalgamationInfo
+  const LocalOrdinal fullblocksize    = numDofsPerDualNode;
+  const LocalOrdinal blockid          = -1;
+  const LocalOrdinal nStridedOffset   = 0;
+  const LocalOrdinal stridedblocksize = fullblocksize;
+
+  //const GlobalOrdinal dualDofOffset = A->getRowMap()->getMaxAllGlobalIndex() + 1;//#
+
+  RCP<Array<LO>> rowTranslation = rcp(new Array<LO>());
+  RCP<Array<LO>> colTranslation = rcp(new Array<LO>());
+  const size_t numMyDualNodes   = dualNodeMap->getLocalNumElements();
+  ////const size_t numMyDualNodes = localNumDualNodes;//#
+  std::cout<<"line 290: localNumDualNodes = "<<localNumDualNodes<<"\n";
+  for (size_t lDualNodeID = 0; lDualNodeID < numMyDualNodes; ++lDualNodeID) {
+    for (LocalOrdinal dof = 0; dof < numDofsPerDualNode; ++dof) {
+      rowTranslation->push_back(lDualNodeID);
+      colTranslation->push_back(lDualNodeID);
+    }
+  }
+
+  std::cout<<"print rowTranslation\n";
+  if (!rowTranslation.is_null()) {
+    std::cout << "Array size: " << rowTranslation->size() << "\n";
+    std::cout << "Elements: ";
+    for (auto elem : *rowTranslation) {
+        std::cout << elem << " ";
+    }
+    std::cout << std::endl;
+  } else {
+      std::cout << "rowTranslation is null.\n";
+  }
+
+  std::cout<<"print colTranslation\n";
+  if (!colTranslation.is_null()) {
+    std::cout << "Array size: " << colTranslation->size() << "\n";
+    std::cout << "Elements: ";
+    for (auto elem : *colTranslation) {
+        std::cout << elem << " ";
+    }
+    std::cout << std::endl;
+  } else {
+      std::cout << "colTranslation is null.\n";
+  }
+
+  ////GlobalOrdinal dualDofOffset = 36;//A01->getRowMap()->getMaxAllGlobalIndex() + 1;//#
+
+  RCP<AmalgamationInfo> dualAmalgamationInfo = rcp(new AmalgamationInfo(rowTranslation, colTranslation,
+                                                                        A01->getDomainMap(), A01->getDomainMap(), A01->getDomainMap(),
+                                                                        fullblocksize, dualDofOffset, blockid, nStridedOffset, stridedblocksize));
+    std::cout<<"print A01->getDomainMap()\n";
+  (A01->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
   // Store dual aggregeate data as well as coarsening information
   dualAggregates->SetNumAggregates(numLocalDualAggregates);
+  if(myRank==0) std::cout<<"we get 195\n";
+  ///Set(currentLevel, "Aggregates", dualAggregates);
   Set(currentLevel, "Aggregates", dualAggregates);
+  std::cout<<"\nnode based: dualAggregates->PrintAllNodesPerAggregate:\n\ntrue:\n";
+  dualAggregates->PrintAllNodesPerAggregate(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), true);//use global node ids
+
+  
+
+
+  if(myRank==0) std::cout<<"we get 197\n";
   Set(currentLevel, "CoarseDualNodeID2PrimalNodeID", coarseMapNodesDualToPrimal);
+  ////Set(currentLevel, "DualNodeID2PrimalNodeID", coarseMapNodesDualToPrimal);
+
+  //Set(currentLevel, "UnAmalgamationInfo", dualAmalgamationInfo);//!#
+  currentLevel.Set("UnAmalgamationInfo", dualAmalgamationInfo, this);
+
+  std::cout << "\ninterfaceAgg 198: coarseMapNodesDualToPrimal in interfaceAgg on rank="<<myRank<<":\n";
+  if (!coarseMapNodesDualToPrimal || coarseMapNodesDualToPrimal->empty()) {
+    std::cout << "Map is empty or null." << std::endl;
+  }
+  for (const auto& pair : *coarseMapNodesDualToPrimal) {
+    std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
+  }
+
+
+  if(myRank==0) std::cout<<"we get 199\n";
   GetOStream(Statistics1) << dualAggregates->description() << std::endl;
+  if(myRank==0) std::cout<<"we get 201\n";
 }  // BuildBasedOnNodeMapping
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
-void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::BuildBasedOnPrimalInterfaceDofMap(
-    const std::string &prefix, Level &currentLevel) const {
+void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::BuildBasedOnPrimalInterfaceDofMap(const std::string &prefix, Level &currentLevel) const {
+  Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
   const GlobalOrdinal GO_ZERO = Teuchos::ScalarTraits<LocalOrdinal>::zero();
   const GlobalOrdinal GO_ONE  = Teuchos::ScalarTraits<GlobalOrdinal>::one();
-
+  std::cout<<"we get interfaceAgg 223\n";
+  std::cout<<"============ currentLevel="<<currentLevel.GetLevelID()<<"\n";
   // filled with striding information from A01
   LocalOrdinal numDofsPerDualNode   = 0;
   LocalOrdinal numDofsPerPrimalNode = 0;
 
   // Grab the off-diagonal block (0,1) from the global blocked operator
   RCP<const Matrix> A01                           = Get<RCP<Matrix>>(currentLevel, "A");
+
+  std::cout << " Matrix Info A01:\n";
+  std::cout << "  Global Rows: " << A01->getGlobalNumRows() << "\n";
+  std::cout << "  Global Cols: " << A01->getGlobalNumCols() << "\n";
+  std::cout << "  Global Nonzeros: " << A01->getGlobalNumEntries() << "\n";
+  std::cout << "  Local Rows: " << A01->getLocalNumRows() << "\n";
+  std::cout << "  Local Nonzeros: " << A01->getLocalNumEntries() << "\n";
+
   RCP<const Aggregates> primalAggregates          = Get<RCP<Aggregates>>(currentLevel, "Aggregates");
   ArrayRCP<const LocalOrdinal> primalVertex2AggId = primalAggregates->GetVertex2AggId()->getData(0);
 
   auto comm        = A01->getRowMap()->getComm();
   const int myRank = comm->getRank();
+
+  if(myRank==0){
+    std::cout<<"\ndof based: primalAggregates.PrintAllNodesPerAggregate:\n\ntrue:\n";
+    primalAggregates->PrintAllNodesPerAggregate(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), true);//use global node ids
+    std::cout<<"\nfalse:\n";
+    primalAggregates->PrintAllNodesPerAggregate(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), false);//dont use global node ids (so i guess local)
+  }
 
   RCP<const Map> primalInterfaceDofRowMap = Teuchos::null;
   if (currentLevel.GetLevelID() == 0) {
@@ -250,6 +489,7 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
    *   are 3 or 6 displacement dofs per node)
    */
   GlobalOrdinal dualDofOffset = A01->getRowMap()->getMaxAllGlobalIndex() + 1;
+  std::cout<<"============interfaceAggs 359: "<<dualDofOffset<<"\n";
   LocalOrdinal dualBlockDim   = numDofsPerDualNode;
   // Generate global replicated mapping "lagrNodeId -> dispNodeId"
   RCP<const Map> dualDofMap    = A01->getDomainMap();
@@ -314,21 +554,40 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   // generate "artificial nodes" for lagrange multipliers
   // the node map is also used for defining the Aggregates for the lagrange multipliers
   std::vector<GlobalOrdinal> dualNodes;
+
+  std::cout<<"A01->getDomainMap()->getLocalNumElements() = "<<A01->getDomainMap()->getLocalNumElements()<<"\n";
+
+  std::cout<<"line 528: dualDofOffset = "<<dualDofOffset<<"\n";
   for (size_t r = 0; r < A01->getDomainMap()->getLocalNumElements(); r++) {
     // determine global Lagrange multiplier row Dof
     // generate a node id using the grid, lagr_blockdim and lagr_offset // todo make sure, that
     // nodeId is unique and does not interfer with the displacement nodes
     GlobalOrdinal gDualDofId  = A01->getDomainMap()->getGlobalElement(r);
+    std::cout<<"gDualDofId = "<<gDualDofId<<"\n";
     GlobalOrdinal gDualNodeId = AmalgamationFactory::DOFGid2NodeId(gDualDofId, dualBlockDim, dualDofOffset, 0);
+    std::cout<<"gDualNodeId = "<<gDualNodeId<<"\n";
     dualNodes.push_back(gDualNodeId);
   }
+  
 
   // remove all duplicates
   dualNodes.erase(std::unique(dualNodes.begin(), dualNodes.end()), dualNodes.end());
 
+  std::cout<<"dualNodes=\n";
+  for (const auto& node : dualNodes) {
+    std::cout << node << " ";
+  }
+  std::cout << std::endl;
+
+  std::cout<<"A01->getRowMap()->getIndexBase() = "<<A01->getRowMap()->getIndexBase()<<"\n";
+
   // define node map for Lagrange multipliers
   Teuchos::RCP<const Map> dualNodeMap = MapFactory::Build(A01->getRowMap()->lib(),
                                                           Teuchos::OrdinalTraits<Xpetra::global_size_t>::invalid(), dualNodes, A01->getRowMap()->getIndexBase(), comm);
+
+
+  std::cout<<"line 495: dualNodeMap:\n";
+  dualNodeMap->describe(*fos, Teuchos::VERB_EXTREME);
 
   // Build aggregates using the lagrange multiplier node map
   Teuchos::RCP<Aggregates> dualAggregates = Teuchos::rcp(new Aggregates(dualNodeMap));
@@ -357,7 +616,8 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
 
   RCP<Array<LO>> rowTranslation = rcp(new Array<LO>());
   RCP<Array<LO>> colTranslation = rcp(new Array<LO>());
-  const size_t numMyDualNodes   = dualNodeMap->getLocalNumElements();
+  const size_t numMyDualNodes   =  dualNodeMap->getLocalNumElements();
+  std::cout<<"line 524: numMyDualNodes = "<<numMyDualNodes<<"\n";
   for (size_t lDualNodeID = 0; lDualNodeID < numMyDualNodes; ++lDualNodeID) {
     for (LocalOrdinal dof = 0; dof < numDofsPerDualNode; ++dof) {
       rowTranslation->push_back(lDualNodeID);
@@ -365,11 +625,41 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
     }
   }
 
+  std::cout<<"print rowTranslation\n";
+  if (!rowTranslation.is_null()) {
+    std::cout << "Array size: " << rowTranslation->size() << "\n";
+    std::cout << "Elements: ";
+    for (auto elem : *rowTranslation) {
+        std::cout << elem << " ";
+    }
+    std::cout << std::endl;
+  } else {
+      std::cout << "rowTranslation is null.\n";
+  }
+
+  std::cout<<"print colTranslation\n";
+  if (!colTranslation.is_null()) {
+    std::cout << "Array size: " << colTranslation->size() << "\n";
+    std::cout << "Elements: ";
+    for (auto elem : *colTranslation) {
+        std::cout << elem << " ";
+    }
+    std::cout << std::endl;
+  } else {
+      std::cout << "colTranslation is null.\n";
+  }
+
+  std::cout<<"line 585: dualDofOffset = "<<dualDofOffset<<"\n";
+
+
   TEUCHOS_ASSERT(A01->isFillComplete());
 
   RCP<AmalgamationInfo> dualAmalgamationInfo = rcp(new AmalgamationInfo(rowTranslation, colTranslation,
                                                                         A01->getDomainMap(), A01->getDomainMap(), A01->getDomainMap(),
                                                                         fullblocksize, dualDofOffset, blockid, nStridedOffset, stridedblocksize));
+
+  std::cout<<"print A01->getDomainMap()\n";
+  (A01->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
   dualAggregates->SetNumAggregates(nLocalAggregates);
   dualAggregates->AggregatesCrossProcessors(primalAggregates->AggregatesCrossProcessors());
@@ -379,6 +669,7 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   else
     GetOStream(Runtime1) << "Interface aggregates do not cross processor boundaries." << std::endl;
 
+  std::cout<<"we get interfaceAgg 418\n";
   currentLevel.Set("Aggregates", dualAggregates, this);
   currentLevel.Set("UnAmalgamationInfo", dualAmalgamationInfo, this);
 

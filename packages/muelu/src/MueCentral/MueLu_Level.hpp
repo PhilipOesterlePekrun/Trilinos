@@ -164,7 +164,7 @@ class Level : public BaseClass {
                                                                                                                         "KeepFlag = "
                                       << GetKeepFlag(ename, fac) << "). " << std::endl
                                       << "Generating factory:" << *fac << " NoFactory = " << NoFactory::get());
-      fac->CallBuild(*this);
+      fac->CallBuild(*this);//###################################
       Release(*fac);
     }
 

@@ -63,7 +63,7 @@ void TwoLevelFactoryBase::CallBuild(Level& requestedLevel) const {
     comm->barrier();
   }
 
-  Build(*requestedLevel.GetPreviousLevel(), requestedLevel);
+  Build(*requestedLevel.GetPreviousLevel(), requestedLevel);//#################
 
   if (this->timerSync_ && !comm.is_null()) {
     TimeMonitor timer(*this, syncTimer);

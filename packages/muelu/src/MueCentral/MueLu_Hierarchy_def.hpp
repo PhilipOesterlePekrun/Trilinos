@@ -395,7 +395,7 @@ bool Hierarchy<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Setup(int coarseLevel
     Ac = level.Get<RCP<Operator> >("A");
   } else if (!isFinestLevel) {
     // We only build here, the release is done later
-    coarseRAPFactory.Build(*level.GetPreviousLevel(), level);
+    coarseRAPFactory.Build(*level.GetPreviousLevel(), level);//######################
   }
 
   bool setLastLevelviaMaxCoarseSize = false;

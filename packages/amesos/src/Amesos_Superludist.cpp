@@ -511,7 +511,7 @@ int Amesos_Superludist::Factor()
 #ifdef HAVE_SUPERLUDIST_ENUM_NAMESPACE
         SLU_DOUBLE
 #else
-        DOUBLE
+              SLU_DOUBLE
 #endif
         ;
     }
@@ -520,7 +520,7 @@ int Amesos_Superludist::Factor()
 #ifdef HAVE_SUPERLUDIST_ENUM_NAMESPACE
         SLU_EXTRA
 #else
-        EXTRA
+              SLU_EXTRA
 #endif
         ;
     }

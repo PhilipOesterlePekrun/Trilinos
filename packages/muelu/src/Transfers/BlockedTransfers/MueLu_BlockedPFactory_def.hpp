@@ -71,10 +71,18 @@ void BlockedPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& fi
 
   RCP<Matrix> Ain = Get<RCP<Matrix> >(fineLevel, "A");
 
+  std::cout << " BlockedPfactory, line 74: Matrix Info Ain:\n";
+  std::cout << "  Global Rows: " << Ain->getGlobalNumRows() << "\n";
+  std::cout << "  Global Cols: " << Ain->getGlobalNumCols() << "\n";
+  std::cout << "  Global Nonzeros: " << Ain->getGlobalNumEntries() << "\n";
+  std::cout << "  Local Rows: " << Ain->getLocalNumRows() << "\n";
+  std::cout << "  Local Nonzeros: " << Ain->getLocalNumEntries() << "\n";
+
   RCP<BlockedCrsMatrix> A = rcp_dynamic_cast<BlockedCrsMatrix>(Ain);
   TEUCHOS_TEST_FOR_EXCEPTION(A.is_null(), Exceptions::BadCast, "Input matrix A is not a BlockedCrsMatrix.");
 
   const int numFactManagers = FactManager_.size();
+  std::cout<<"BlockedPFactory, line 85; numFactManagers = "<<numFactManagers<<"\n";
 
   // Plausibility check
   TEUCHOS_TEST_FOR_EXCEPTION(A->Rows() != as<size_t>(numFactManagers), Exceptions::RuntimeError,
@@ -112,7 +120,7 @@ void BlockedPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& fi
     SetFactoryManager coarseSFM(rcpFromRef(coarseLevel), factManager);
 
     if (!restrictionMode_)
-      subBlockP[i] = coarseLevel.Get<RCP<Matrix> >("P", factManager->GetFactory("P").get());
+      subBlockP[i] = coarseLevel.Get<RCP<Matrix> >("P", factManager->GetFactory("P").get());//################
     else
       subBlockP[i] = coarseLevel.Get<RCP<Matrix> >("R", factManager->GetFactory("R").get());
 
@@ -129,7 +137,7 @@ void BlockedPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& fi
                       subBlockP[i]->getRangeMap(),  // actual global IDs (Thyra or Xpetra)
                       stridedRgData,
                       strPartialMap->getStridedBlockId(),
-                      strPartialMap->getOffset());
+                      strPartialMap->getOffset());//#try 36
     // subBlockPRangeMaps[i] = subBlockP[i]->getRowMap("stridedMaps");
 
     // Use plain range map to determine the DOF ids
@@ -183,6 +191,8 @@ void BlockedPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& fi
     rangeIndexBase  = A->getDomainMap()->getIndexBase();
     domainIndexBase = A->getRangeMap()->getIndexBase();
   }
+  std::cout<<"BlockedPFactory, line 184: rangeIndexBase = "<<rangeIndexBase<<"\n";
+  std::cout<<"BlockedPFactory, line 184: domainIndexBase = "<<domainIndexBase<<"\n";
 
   // Build full range map.
   // If original range map has striding information, then transfer it to the
@@ -212,9 +222,16 @@ void BlockedPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& fi
   }
 
   ArrayView<GO> fullDomainMapGIDs(fullDomainMapVector.size() ? &fullDomainMapVector[0] : 0, fullDomainMapVector.size());
+
+  std::cout<<"print fullDomainMapGIDs:\n";
+  for (size_t i = 0; i < static_cast<size_t>(fullDomainMapGIDs.size()); ++i) {
+    std::cout << "  [" << i << "] -> " << fullDomainMapGIDs[i] << "\n";
+  }
+
   RCP<const StridedMap> stridedDoFullMap = rcp_dynamic_cast<const StridedMap>(domainAMapExtractor->getFullMap());
   RCP<const Map> fullDomainMap           = null;
   if (stridedDoFullMap != null) {
+    std::cout<<"BlockedPFactory::Build() Line 218: if (stridedDoFullMap != null)\n";
     TEUCHOS_TEST_FOR_EXCEPTION(stridedDoFullMap == Teuchos::null, Exceptions::BadCast,
                                "MueLu::BlockedPFactory::Build: full map in domain map extractor has no striding information!");
 
@@ -229,6 +246,7 @@ void BlockedPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& fi
                            -1, /* the full map vector should always have strided block id -1! */
                            stridedDoFullMap->getOffset());
   } else {
+    std::cout<<"BlockedPFactory::Build() Line 233: else\n";
     fullDomainMap = MapFactory::Build(
         A->getDomainMap()->lib(),
         Teuchos::OrdinalTraits<Xpetra::global_size_t>::invalid(),
@@ -239,7 +257,43 @@ void BlockedPFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(Level& fi
 
   // Build map extractors
   RCP<const MapExtractor> rangeMapExtractor  = MapExtractorFactory::Build(fullRangeMap, subBlockPRangeMaps, rangeAMapExtractor->getThyraMode());
-  RCP<const MapExtractor> domainMapExtractor = MapExtractorFactory::Build(fullDomainMap, subBlockPDomainMaps, domainAMapExtractor->getThyraMode());
+  std::cout<<"============================================ BlockedPFactory::Build() Line 242\n";
+
+//* print fullDomainMap
+std::cout<<"\n=====WE PRINT fullDomainMap\n";
+
+std::cout << "  Num Global Elements: " << fullDomainMap->getGlobalNumElements() << "\n";
+std::cout << "  Num Local Elements: " << fullDomainMap->getLocalNumElements() << "\n";
+std::cout << "  Min Global Index: " << fullDomainMap->getMinAllGlobalIndex() << "\n";
+std::cout << "  Max Global Index: " << fullDomainMap->getMaxAllGlobalIndex() << "\n";
+
+std::cout << "  Global Indices: ";
+Teuchos::ArrayView<const int> elements11 = fullDomainMap->getLocalElementList();
+for (int i = 0; i < elements11.size(); i++) {
+  std::cout << elements11[i] << " ";
+}
+std::cout << "\n";
+
+//* print subBlockPDomainMaps
+std::cout<<"\n=====WE PRINT subBlockPDomainMaps\n";
+
+std::cout << "Printing " << subBlockPDomainMaps.size() << " maps:\n";
+    for (size_t i = 0; i < subBlockPDomainMaps.size(); ++i) {
+        std::cout << "  Num Global Elements: " << subBlockPDomainMaps[i]->getGlobalNumElements() << "\n";
+        std::cout << "  Num Local Elements: " << subBlockPDomainMaps[i]->getLocalNumElements() << "\n";
+        std::cout << "  Min Global Index: " << subBlockPDomainMaps[i]->getMinAllGlobalIndex() << "\n";
+        std::cout << "  Max Global Index: " << subBlockPDomainMaps[i]->getMaxAllGlobalIndex() << "\n";
+
+        std::cout << "  Global Indices: ";
+        Teuchos::ArrayView<const int> elements22 = subBlockPDomainMaps[i]->getLocalElementList();
+        for (int j = 0; j < elements22.size(); j++) {
+          std::cout << elements22[j] << " ";
+        }
+        std::cout << "\n";
+    }
+
+
+  RCP<const MapExtractor> domainMapExtractor = MapExtractorFactory::Build(fullDomainMap, subBlockPDomainMaps, domainAMapExtractor->getThyraMode());//#################
 
   RCP<BlockedCrsMatrix> P = rcp(new BlockedCrsMatrix(rangeMapExtractor, domainMapExtractor, 10));
   for (size_t i = 0; i < subBlockPRangeMaps.size(); i++)

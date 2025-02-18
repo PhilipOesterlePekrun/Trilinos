@@ -39,7 +39,7 @@ class MapExtractorFactory {
   Build(const Teuchos::RCP<const Map>& fullmap,
         const std::vector<Teuchos::RCP<const Map>>& maps,
         bool bThyraMode = false) {
-    return rcp(new Xpetra::MapExtractor<Scalar, LocalOrdinal, GlobalOrdinal, Node>(fullmap, maps, bThyraMode));
+    return rcp(new Xpetra::MapExtractor<Scalar, LocalOrdinal, GlobalOrdinal, Node>(fullmap, maps, bThyraMode));//####################
   }
 
   /*!

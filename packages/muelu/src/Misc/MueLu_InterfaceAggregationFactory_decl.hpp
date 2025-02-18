@@ -127,6 +127,8 @@ class InterfaceAggregationFactory : public SingleLevelFactoryBase {
    * @param[in/out] currentLevel Level on which the aggregation needs to be performed
    */
   void BuildBasedOnPrimalInterfaceDofMap(const std::string& prefix, Level& currentLevel) const;
+
+  mutable RCP<const FactoryBase> AFact_;
 };
 
 }  // namespace MueLu
