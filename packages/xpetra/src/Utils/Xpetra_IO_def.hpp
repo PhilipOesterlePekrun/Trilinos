@@ -424,6 +424,7 @@ IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read(const std::string& filename,
   const Xpetra::UnderlyingLib lib = rowMap->lib();
   if (binary == false) {
     if (lib == Xpetra::UseEpetra) {
+      std::cout<<"Xpetra_IO line 427 lib == Xpetra::UseEpetra\n";
 #if defined(HAVE_XPETRA_EPETRA) && defined(HAVE_XPETRA_EPETRAEXT)
       Epetra_CrsMatrix* eA;
       const RCP<const Epetra_Comm> epcomm = Xpetra::toEpetra(rowMap->getComm());
@@ -451,6 +452,7 @@ IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read(const std::string& filename,
       throw Exceptions::RuntimeError("Xpetra has not been compiled with Epetra and EpetraExt support.");
 #endif
     } else if (lib == Xpetra::UseTpetra) {
+      std::cout<<"Xpetra_IO line 455 lib == Xpetra::UseTpetra\n";
 #ifdef HAVE_XPETRA_TPETRA
       typedef Tpetra::CrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node> sparse_matrix_type;
       typedef Tpetra::MatrixMarket::Reader<sparse_matrix_type> reader_type;

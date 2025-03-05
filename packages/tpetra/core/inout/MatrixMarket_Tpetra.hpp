@@ -3201,6 +3201,9 @@ namespace Tpetra {
         typedef Teuchos::ScalarTraits<scalar_type> STS;
 
         RCP<const Comm<int> > pComm = rowMap->getComm ();
+        std::cout<<"MM line 3204: rowMap->describe()\n";
+        //rowMap->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
         const int myRank = pComm->getRank ();
         const int rootRank = 0;
         const bool extraDebug = false;
@@ -3648,6 +3651,10 @@ namespace Tpetra {
           Teuchos::getFancyOStream (Teuchos::rcpFromRef (cerr)) : null;
 
         RCP<const map_type> gatherRowMap = Details::computeGatherMap (rowMap, err, debug);
+
+        std::cout<<"MM line 3655: rowMap->describe()\n";
+        //rowMap->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
         ArrayView<const global_ordinal_type> myRows =
             gatherRowMap->getLocalElementList ();
         const size_type myNumRows = myRows.size ();
@@ -3655,6 +3662,7 @@ namespace Tpetra {
 
         ArrayRCP<size_t> gatherNumEntriesPerRow = arcp<size_t>(myNumRows);
         for (size_type i_ = 0; i_ < myNumRows; i_++) {
+          //std::cout<<"MM line 3658: "<<myRows[i_]<<", "<<indexBase<<"\n";
           gatherNumEntriesPerRow[i_] = numEntriesPerRow[myRows[i_]-indexBase];
         }
 

@@ -273,6 +273,7 @@ ArrayRCP<T>& ArrayRCP<T>::operator=(const ArrayRCP<T>& r_ptr)
   node_ = r_ptr.access_private_node(); // May throw in debug mode!
   ptr_ = r_ptr.ptr_;
   lowerOffset_ = r_ptr.lowerOffset_;
+  ////std::cout<<"arrayrcp line 276: lowerOffset_ = "<<lowerOffset_<<"\n";
   upperOffset_ = r_ptr.upperOffset_;
   return *this;
   // NOTE: It is critical that the assignment of ptr_ come *after* the
@@ -289,6 +290,7 @@ ArrayRCP<const T>::operator= (const ArrayRCP<const T>& r_ptr)
   node_ = r_ptr.access_private_node (); // May throw in debug mode!
   ptr_ = r_ptr.ptr_;
   lowerOffset_ = r_ptr.lowerOffset_;
+  ////std::cout<<"arrayrcp line 293: lowerOffset_ = "<<lowerOffset_<<"\n";
   upperOffset_ = r_ptr.upperOffset_;
   return *this;
   // NOTE: The assignment of ptr_ MUST come after the assignment of
@@ -634,6 +636,7 @@ ArrayRCP<T>::persistingView( size_type lowerOffset_in, size_type size_in ) const
   ArrayRCP<T> ptr = *this;
   ptr.ptr_ = ptr.ptr_ + lowerOffset_in;
   ptr.lowerOffset_ = 0;
+  ////std::cout<<"arrayrcp line 639: lowerOffset_ = "<<lowerOffset_<<"\n";
   ptr.upperOffset_ = size_in - 1;
   return ptr;
 }
@@ -650,6 +653,7 @@ ArrayRCP<const T>::persistingView (size_type lowerOffset_in, size_type size_in) 
   ArrayRCP<const T> ptr = *this;
   ptr.ptr_ = ptr.ptr_ + lowerOffset_in;
   ptr.lowerOffset_ = 0;
+  ////std::cout<<"arrayrcp line 656: lowerOffset_ = "<<lowerOffset_<<"\n";
   ptr.upperOffset_ = size_in - 1;
   return ptr;
 }

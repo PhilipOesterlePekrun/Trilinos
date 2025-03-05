@@ -19,6 +19,14 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
       Lagr2Dof.txt
       simple_1dof.xml
     )
+    TRIBITS_COPY_FILES_TO_BINARY_DIR(MeshTying_cpThreeDof
+    SOURCE_FILES
+      G_3dof_mm.txt
+      GT_3dof_mm.txt
+      C_3dof_mm.txt
+      f_3dof_mm.txt
+      simple_3dof.xml
+    )
 
   TRIBITS_COPY_FILES_TO_BINARY_DIR(MeshTying2D_cp_small
     SOURCE_FILES
@@ -44,6 +52,12 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
   TRIBITS_ADD_EXECUTABLE(
     MeshTyingBlocked_NodeBased
     SOURCES MeshTyingBlocked_NodeBased.cpp
+    COMM serial mpi
+    )
+
+  TRIBITS_ADD_EXECUTABLE(
+    MeshTyingBlocked_NodeBased_3dof
+    SOURCES MeshTyingBlocked_NodeBased_3dof.cpp
     COMM serial mpi
     )
 
@@ -88,6 +102,13 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
   TRIBITS_ADD_TEST(
     MeshTyingBlocked_NodeBased
     NAME "MeshTyingBlocked_NodeBased_simpleSmoother"
+    ARGS "-linAlgebra=Tpetra"
+    COMM serial mpi
+    NUM_MPI_PROCS 1
+  )
+  TRIBITS_ADD_TEST(
+    MeshTyingBlocked_NodeBased_3dof
+    NAME "MeshTyingBlocked_NodeBased_simpleSmoother_3dof"
     ARGS "-linAlgebra=Tpetra"
     COMM serial mpi
     NUM_MPI_PROCS 1
