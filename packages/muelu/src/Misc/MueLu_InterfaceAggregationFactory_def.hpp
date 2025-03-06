@@ -217,17 +217,17 @@ Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFrom
     auto comm                              = operatorRangeMap->getComm();
     std::vector<GlobalOrdinal> myDualNodes = {};
 
-std::cout<<"print A01->getDomainMap()\n";
-  (A01->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+//std::cout<<"print A01->getDomainMap()\n";
+  //(A01->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
     std::cout<<"line 221: dualDofOffset = "<<dualDofOffset<<"\n";
     //for (size_t i = 0; i < operatorRangeMapA01->getLocalNumElements(); i++){
     for (size_t i = 0; i < A01->getDomainMap()->getLocalNumElements(); i++){
       ///myDualNodes.push_back((operatorRangeMap->getGlobalElement(i) - indexBase) / numDofsPerDualNode + indexBase);
       GlobalOrdinal gDualDofId  = A01->getDomainMap()->getGlobalElement(i);
-      std::cout<<"gDualDofId = "<<gDualDofId<<"\n";
+      //std::cout<<"gDualDofId = "<<gDualDofId<<"\n";
       GlobalOrdinal gDualNodeId = AmalgamationFactory::DOFGid2NodeId(gDualDofId, numDofsPerDualNode, dualDofOffset, 0);
-      std::cout<<"gDualNodeId = "<<gDualNodeId<<"\n";
+      //std::cout<<"gDualNodeId = "<<gDualNodeId<<"\n";
       myDualNodes.push_back(gDualNodeId);
     }
     
@@ -246,8 +246,8 @@ std::cout<<"print A01->getDomainMap()\n";
     dualNodeMap = MapFactory::Build(operatorRangeMapA01->lib(), Teuchos::OrdinalTraits<Xpetra::global_size_t>::invalid(), myDualNodes, indexBase, comm);
   }
   
-  std::cout<<"line 223: dualNodeMap:\n";
-  dualNodeMap->describe(*fos, Teuchos::VERB_EXTREME);
+  //std::cout<<"line 223: dualNodeMap:\n";
+  //dualNodeMap->describe(*fos, Teuchos::VERB_EXTREME);
 
   TEUCHOS_TEST_FOR_EXCEPTION(localNumDualNodes != Teuchos::as<LocalOrdinal>(dualNodeMap->getLocalNumElements()),
                              std::runtime_error, prefix << " Local number of dual nodes given by user is incompatible to the dual node map.");
@@ -266,13 +266,13 @@ std::cout<<"print A01->getDomainMap()\n";
 
   LocalOrdinal numLocalDualAggregates = 0;
 
-  std::cout << "\ninterfaceAgg 170: mapNodesDualToPrimal in interfaceAgg on rank="<<myRank<<":\n";
+  /*std::cout << "\ninterfaceAgg 170: mapNodesDualToPrimal in interfaceAgg on rank="<<myRank<<":\n";
   if (!mapNodesDualToPrimal || mapNodesDualToPrimal->empty()) {
     std::cout << "Map is empty or null." << std::endl;
   }
   for (const auto& pair : *mapNodesDualToPrimal) {
-    std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
-  }
+    std::cout << pair.first << " " << pair.second << std::endl;
+  }*/
 
   /* Loop over the local dual nodes and
    *
@@ -547,7 +547,7 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
       colTranslation->push_back(lDualNodeID);
     }
   }
-
+/*
   std::cout<<"print rowTranslation\n";
   if (!rowTranslation.is_null()) {
     std::cout << "Array size: " << rowTranslation->size() << "\n";
@@ -570,7 +570,7 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
     std::cout << std::endl;
   } else {
       std::cout << "colTranslation is null.\n";
-  }
+  }*/
 
   std::cout<<"line 585: dualDofOffset = "<<dualDofOffset<<"\n";
 
@@ -581,8 +581,8 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
                                                                         A01->getDomainMap(), A01->getDomainMap(), A01->getDomainMap(),
                                                                         fullblocksize, dualDofOffset, blockid, nStridedOffset, stridedblocksize));
 
-  std::cout<<"print A01->getDomainMap()\n";
-  (A01->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+  //std::cout<<"print A01->getDomainMap()\n";
+  //(A01->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
   dualAggregates->SetNumAggregates(nLocalAggregates);
   dualAggregates->AggregatesCrossProcessors(primalAggregates->AggregatesCrossProcessors());

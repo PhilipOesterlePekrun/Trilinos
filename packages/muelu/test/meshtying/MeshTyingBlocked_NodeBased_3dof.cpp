@@ -105,8 +105,8 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   RCP<FancyOStream> out     = fancyOStream(rcpFromRef(std::cout));
   out->setOutputToRootOnly(0);
 
-  const GO globalPrimalNumDofs    = 1599;
-  const GO globalDualNumDofs      = 300;
+  const GO globalPrimalNumDofs    = 2058;
+  const GO globalDualNumDofs      = 147;
   const GO globalNumDofs          = globalPrimalNumDofs + globalDualNumDofs;  // used for the maps
   const size_t nPrimalDofsPerNode = 3;
   const GO globalPrimalNumNodes   = globalPrimalNumDofs / nPrimalDofsPerNode;
@@ -114,7 +114,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
 
   std::map<GO, GO> lagr2Dof;
   std::map<LO, LO> myLagr2Dof;
-  read_Lagr2Dof<GO>("Lagr2Dof.txt", lagr2Dof);
+  read_Lagr2Dof<GO>("Lagr2Dof_3dof.txt", lagr2Dof);
 
   // Construct the blocked map using the Xpetra-style indexing
   RCP<const tpetra_map_type> primalNodeMap = Tpetra::createUniformContigMapWithNode<LocalOrdinal, GlobalOrdinal, Node>(globalPrimalNumNodes, comm);
@@ -190,13 +190,13 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   // Read input matrices
   typedef Tpetra::MatrixMarket::Reader<SparseMatrixType> reader_type;
 
-  RCP<Matrix> xQ  = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("Q_mm.txt", primalXMap, primalXMap, primalXMap, primalXMap);
-  RCP<Matrix> xG  = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("G_3dof_mm.txt", primalXMap, dualXMap, dualXMap, primalXMap);
+  RCP<Matrix> xQ  = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("m3D_1_19_block00_mm.txt", primalXMap, primalXMap, primalXMap, primalXMap);
+  RCP<Matrix> xG  = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("m3D_1_19_block01_mm.txt", primalXMap, dualXMap, dualXMap, primalXMap);
   std::cout<<"test line 149: xG->getColMap()->describe() =\n";
   xG->getColMap()->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
-  RCP<Matrix> xGT = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("GT_3dof_mm.txt", dualXMap, primalXMap, primalXMap, dualXMap);
-  RCP<Matrix> xC  = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("C_3dof_mm.txt", dualXMap, dualXMap, dualXMap, dualXMap);
+  RCP<Matrix> xGT = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("m3D_1_19_block10_mm.txt", dualXMap, primalXMap, primalXMap, dualXMap);
+  RCP<Matrix> xC  = Xpetra::IO<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Read("m3D_1_19_block11_mm.txt", dualXMap, dualXMap, dualXMap, dualXMap);
   ////////////
 
 std::cout<<"xG\n";
@@ -440,10 +440,15 @@ std::cout<<"xC\n";
 //////////////////////////////////////////
 
 
-  RCP<CrsMatrixWrap> xwQ  = Teuchos::rcp_dynamic_cast<CrsMatrixWrap>(xQ);
+  /*RCP<CrsMatrixWrap> xwQ  = Teuchos::rcp_dynamic_cast<CrsMatrixWrap>(xQ);
   RCP<CrsMatrixWrap> xwG  = Teuchos::rcp_dynamic_cast<CrsMatrixWrap>(xG_new);
   RCP<CrsMatrixWrap> xwGT = Teuchos::rcp_dynamic_cast<CrsMatrixWrap>(xGT_new);
-  RCP<CrsMatrixWrap> xwC  = Teuchos::rcp_dynamic_cast<CrsMatrixWrap>(xC_new);
+  RCP<CrsMatrixWrap> xwC  = Teuchos::rcp_dynamic_cast<CrsMatrixWrap>(xC_new);*/
+
+  RCP<CrsMatrixWrap> xwQ  = Teuchos::rcp_dynamic_cast<CrsMatrixWrap>(xQ);
+  RCP<CrsMatrixWrap> xwG  = xG_new;
+  RCP<CrsMatrixWrap> xwGT = xGT_new;
+  RCP<CrsMatrixWrap> xwC  = xC_new;
 
   /*Teuchos::RCP<Tpetra::CrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>> tpetraMat =
             Xpetra::Helpers<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Op2TpetraCrs(xwG->getCrsMatrix());
@@ -472,6 +477,20 @@ std::cout<<"xC\n";
   blockedMatrix->setMatrix(1, 1, xwC);
   blockedMatrix->fillComplete();
 
+
+  std::cout<<"domainMap of blockedMatrix(0,0):\n";
+  ((blockedMatrix->getMatrix(0, 0))->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+  std::cout<<"rangeMap of blockedMatrix(0,0):\n";
+  ((blockedMatrix->getMatrix(0, 0))->getRangeMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+  std::cout<<"colMap of blockedMatrix(0,0):\n";
+  ((blockedMatrix->getMatrix(0, 0))->getColMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+  std::cout<<"rowMap of blockedMatrix(0,0):\n";
+  ((blockedMatrix->getMatrix(0, 0))->getRowMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+
   std::cout<<"domainMap of blockedMatrix(0,1):\n";
   ((blockedMatrix->getMatrix(0, 1))->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
@@ -499,20 +518,28 @@ std::cout<<"xC\n";
   ((blockedMatrix->getMatrix(1, 0))->getRowMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
 
+  std::cout<<"domainMap of blockedMatrix(1,1):\n";
+  ((blockedMatrix->getMatrix(1, 1))->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  std::cout<<"rangeMap of blockedMatrix(1,1):\n";
+  ((blockedMatrix->getMatrix(1, 1))->getRangeMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  std::cout<<"colMap of blockedMatrix(1,1):\n";
+  ((blockedMatrix->getMatrix(1, 1))->getColMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  std::cout<<"rowMap of blockedMatrix(1,1):\n";
+  ((blockedMatrix->getMatrix(1, 1))->getRowMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
-  
+  //##########
 
   // Create the preconditioner
-  std::string xmlFile = "simple_3dof.xml";
+  std::string xmlFile = "simple_3dof_2.xml";
 
   RCP<ParameterList> params     = Teuchos::getParametersFromXmlFile(xmlFile);
   ParameterList &userDataParams = params->sublist("user data");
   userDataParams.set<RCP<std::map<LO, LO>>>("DualNodeID2PrimalNodeID", rcpFromRef(myLagr2Dof));
 
-  RCP<Hierarchy> H = MueLu::CreateXpetraPreconditioner(Teuchos::rcp_dynamic_cast<Matrix>(blockedMatrix, true), *params);
+  RCP<Hierarchy> H = MueLu::CreateXpetraPreconditioner(Teuchos::rcp_dynamic_cast<Matrix>(blockedMatrix, true), *params);//#
   ///RCP<MueLu::Hierarchy<SC, LO, GO, NO>> H_ = mueLuFactory.CreateHierarchy();
   H->IsPreconditioner(true);
   H->GetLevel(0)->Set(
@@ -548,7 +575,7 @@ std::cout<<"xC\n";
   RCP<OP> belosOp   = rcp(new Belos::XpetraOp<Scalar, LocalOrdinal, GlobalOrdinal, Node>(blockedMatrix));
   RCP<OP> belosPrec = rcp(new Belos::MueLuOp<Scalar, LocalOrdinal, GlobalOrdinal, Node>(H));
 
-  RCP<tpetra_mvector_type> rhsMultiVector      = reader_type::readDenseFile("f_3dof_mm.txt", comm, fullMap);
+  RCP<tpetra_mvector_type> rhsMultiVector      = reader_type::readDenseFile("m3D_1_19_f.txt", comm, fullMap);
   RCP<tpetra_mvector_type> solutionMultiVector = rcp(new tpetra_mvector_type(fullMap, 1));
 
   RCP<MultiVector> rhsXMultiVector      = rcp(new TpetraMultiVector(rhsMultiVector));

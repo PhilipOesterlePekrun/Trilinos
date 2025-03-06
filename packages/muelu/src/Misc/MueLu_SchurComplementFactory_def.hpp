@@ -104,11 +104,11 @@ SchurComplementFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::ComputeSchurC
       RCP<ParameterList> myparams = rcp(new ParameterList);
       myparams->set("compute global constants", true);
 
-      std::cout<<"schurcomp, line 107: A01->getRangeMap():\n";
+      /*std::cout<<"schurcomp, line 107: A01->getRangeMap():\n";
       A01->getRangeMap()->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
       std::cout<<"schurcomp, line 107: Ainv->getDomainMap():\n";
-      Ainv->getDomainMap()->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+      Ainv->getDomainMap()->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);*///#
 
       // -1/omega*Ainv*A01
       TEUCHOS_TEST_FOR_EXCEPTION(A01->getRangeMap()->isSameAs(*(Ainv->getDomainMap())) == false, Exceptions::RuntimeError,

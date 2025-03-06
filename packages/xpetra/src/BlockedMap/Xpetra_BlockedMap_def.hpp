@@ -33,14 +33,14 @@ BlockedMap<LocalOrdinal, GlobalOrdinal, Node>::
     // use Xpetra-style numbering for sub-block maps
     // That is, all sub-block maps have unique GIDs which may not be contiguous and start with GIDs different than zero.
 
-    std::cout<<"BlockedMap, line 36: fullMap->describe()\n";
+    /*std::cout<<"BlockedMap, line 36: fullMap->describe()\n";
     fullmap->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
     std::cout<<"BlockedMap, line 39: maps->at(0)->describe()\n";
     maps.at(0)->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
     std::cout<<"BlockedMap, line 42: maps->at(1)->describe()\n";
-    maps.at(1)->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+    maps.at(1)->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);*///#
 
     // plausibility check
     size_t numAllElements = 0;
