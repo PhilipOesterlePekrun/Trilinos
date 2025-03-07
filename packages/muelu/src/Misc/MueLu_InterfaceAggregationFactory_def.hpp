@@ -24,6 +24,28 @@
 
 #include "MueLu_FactoryManagerBase.hpp"//#
 
+
+
+
+
+#include <iostream>
+#include <fstream>
+#include <map>
+void writeMapToFile(const std::map<int, int>& myMap, const std::string& filename) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        std::cerr << "Error opening file for writing\n";
+        return;
+    }
+
+    for (const auto& [key, value] : myMap) {
+        outFile << key << " " << value << "\n";
+    }
+
+    outFile.close();
+}
+
+
 namespace MueLu {
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
@@ -192,12 +214,26 @@ Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFrom
   else
     mapNodesDualToPrimal = Get<RCP<Dual2Primal_type>>(currentLevel, "DualNodeID2PrimalNodeID");
 
+    
+
   RCP<const Map> operatorRangeMap = A->getRangeMap();
   const size_t myRank             = operatorRangeMap->getComm()->getRank();
 
   RCP<const Map> operatorRangeMapA01 = A01->getRangeMap();//#
   GlobalOrdinal dualDofOffset = A01->getRowMap()->getMaxAllGlobalIndex() + 1;
 
+
+  std::cout<<"interfaceAggs 217:\n";
+  auto comm1                              = operatorRangeMap->getComm();
+  for (int i = 0; i < comm1->getSize(); ++i) {
+    if (comm1->getRank() == i) {
+        std::cout << "Rank " << i << std::endl;
+        for(const auto& entry : *mapNodesDualToPrimal){
+          std::cout<<entry.first<<" "<<entry.second<<"\n";
+        }
+    }
+    comm1->barrier(); // Synchronize before the next rank goes
+  }
   
 
 
@@ -206,8 +242,13 @@ Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFrom
 
   std::cout<<"myRank= "<<myRank<<"\n\tlocalNumDualNodes = "<<localNumDualNodes<<"\n\tTeuchos::as<LocalOrdinal>(mapNodesDualToPrimal->size() = "<<Teuchos::as<LocalOrdinal>(mapNodesDualToPrimal->size())<<"\n\n";
 
+  /*std::cout<<"mapNodesDualToPrimal for storing:\n";
+  for(int i=0;i<Teuchos::as<int>(mapNodesDualToPrimal->size());i++){
+    std::cout<<myRank<<" "<<
+  }*/
+
   TEUCHOS_TEST_FOR_EXCEPTION(localNumDualNodes != Teuchos::as<LocalOrdinal>(mapNodesDualToPrimal->size()),
-                             std::runtime_error, prefix << " MueLu requires the range map and the DualNodeID2PrimalNodeID map to be compatible.");
+                          std::runtime_error, prefix << " MueLu requires the range map and the DualNodeID2PrimalNodeID map to be compatible.");
 
   RCP<const Map> dualNodeMap = Teuchos::null;
   if (numDofsPerDualNode == 1)
@@ -220,7 +261,11 @@ Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFrom
 //std::cout<<"print A01->getDomainMap()\n";
   //(A01->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
-    std::cout<<"line 221: dualDofOffset = "<<dualDofOffset<<"\n";
+  std::cout<<"test line 264, A01->getDomainMap():\n";
+  A01->getDomainMap()->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+  A01->getRowMap()->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    std::cout<<"line 271: dualDofOffset = "<<dualDofOffset<<"\n";
     //for (size_t i = 0; i < operatorRangeMapA01->getLocalNumElements(); i++){
     for (size_t i = 0; i < A01->getDomainMap()->getLocalNumElements(); i++){
       ///myDualNodes.push_back((operatorRangeMap->getGlobalElement(i) - indexBase) / numDofsPerDualNode + indexBase);
@@ -234,11 +279,17 @@ Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFrom
     // remove all duplicates
     myDualNodes.erase(std::unique(myDualNodes.begin(), myDualNodes.end()), myDualNodes.end());
 
-    std::cout<<"myDualNodes=dualNodes=\n";
-    for (const auto& node : myDualNodes) {
-      std::cout << node << " ";
+    std::cout<<"interfaceAggs 281:\n";
+  auto comm1                              = operatorRangeMap->getComm();
+  for (int i = 0; i < comm1->getSize(); ++i) {
+    if (comm1->getRank() == i) {
+        std::cout << "Rank " << i << std::endl;
+        for(const auto& ele : myDualNodes){
+          std::cout<<ele<<"\n";
+        }
     }
-    std::cout << std::endl;
+    comm1->barrier(); // Synchronize before the next rank goes
+  }
 
     std::cout<<"indexBase = "<<indexBase<<"\n";
 
@@ -330,6 +381,8 @@ Teuchos::RCP<Teuchos::FancyOStream> fos = Teuchos::fancyOStream(Teuchos::rcpFrom
   currentLevel.Set("UnAmalgamationInfo", dualAmalgamationInfo, this);
 
   GetOStream(Statistics1) << dualAggregates->description() << std::endl;
+
+  std::cout<<"interfaceAggs end buildbasedOnNodeMapping()\n";
 }  // BuildBasedOnNodeMapping
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>

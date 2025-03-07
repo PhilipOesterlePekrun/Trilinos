@@ -477,60 +477,110 @@ std::cout<<"xC\n";
   blockedMatrix->setMatrix(1, 1, xwC);
   blockedMatrix->fillComplete();
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  std::cout<<"domainMap of blockedMatrix(0,0):\n";
+std::cout<<"==================================================================\nBLOCKMATRIX MAPS ARE PRINTED\n==================================================================\n\n";
+
+std::cout<<"domainMap of blockedMatrix(0,0):\n";
+comm->barrier();
   ((blockedMatrix->getMatrix(0, 0))->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rangeMap of blockedMatrix(0,0):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(0, 0))->getRangeMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"colMap of blockedMatrix(0,0):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(0, 0))->getColMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rowMap of blockedMatrix(0,0):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(0, 0))->getRowMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+  comm->barrier();
 
 
   std::cout<<"domainMap of blockedMatrix(0,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(0, 1))->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rangeMap of blockedMatrix(0,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(0, 1))->getRangeMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"colMap of blockedMatrix(0,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(0, 1))->getColMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rowMap of blockedMatrix(0,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(0, 1))->getRowMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+  comm->barrier();
 
 
 
   std::cout<<"domainMap of blockedMatrix(1,0):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 0))->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rangeMap of blockedMatrix(1,0):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 0))->getRangeMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
   std::cout<<"colMap of blockedMatrix(1,0):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 0))->getColMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rowMap of blockedMatrix(1,0):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 0))->getRowMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+  comm->barrier();
 
 
   std::cout<<"domainMap of blockedMatrix(1,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 1))->getDomainMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rangeMap of blockedMatrix(1,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 1))->getRangeMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"colMap of blockedMatrix(1,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 1))->getColMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
+  comm->barrier();
+
   std::cout<<"rowMap of blockedMatrix(1,1):\n";
+  comm->barrier();
   ((blockedMatrix->getMatrix(1, 1))->getRowMap())->describe(*Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
-  //##########
+  comm->barrier();
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
   // Create the preconditioner
   std::string xmlFile = "simple_3dof_2.xml";

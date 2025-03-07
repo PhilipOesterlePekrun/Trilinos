@@ -132,7 +132,7 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
     COMM serial mpi
     NUM_MPI_PROCS 1
   )#//
-  TRIBITS_ADD_TEST(
+ TRIBITS_ADD_TEST(
     MeshTyingBlocked_NodeBased_3dof_2
     NAME "MeshTyingBlocked_NodeBased_simpleSmoother_3dof_2"
     ARGS "-linAlgebra=Tpetra"
