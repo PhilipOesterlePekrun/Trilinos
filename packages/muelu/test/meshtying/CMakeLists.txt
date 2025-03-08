@@ -19,27 +19,14 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
       Lagr2Dof.txt
       simple_1dof.xml
     )
-    TRIBITS_COPY_FILES_TO_BINARY_DIR(MeshTying_cpThreeDof
+
+  TRIBITS_COPY_FILES_TO_BINARY_DIR(MeshTying_cpThreeDof
     SOURCE_FILES
-      G_3dof_mm.txt#//#
-      GT_3dof_mm.txt#//#
-      C_3dof_mm.txt#//#
-      f_3dof_mm.txt#//#
-      simple_3dof.xml#//#
-      simple_3dof_2.xml#//#
-      m3D_1_19_block00_mm.txt
-      m3D_1_19_block01_mm.txt
-      m3D_1_19_block10_mm.txt
-      m3D_1_19_block11_mm.txt
+      MeshTyingBlocked_NodeBased_3dualDofs_matrix.mm
+      MeshTyingBlocked_NodeBased_3dualDofs_rhs.mm
+      MeshTyingBlocked_NodeBased_3dualDofs_nullspace1.mm
       Lagr2Dof_3dof.txt
-    )
-    TRIBITS_COPY_FILES_TO_BINARY_DIR(MeshTying_cpThreeDof_two
-    SOURCE_FILES
-      simple_3dof_2.xml#//#
-      Lagr2Dof_3dof.txt
-      MeshTyingBlocked_NodeBased_3dof_f.mm
-      MeshTyingBlocked_NodeBased_3dof_matrix.mm
-      MeshTyingBlocked_NodeBased_3dof_nullspace1.mm
+      simple_3dof.xml
     )
 
   TRIBITS_COPY_FILES_TO_BINARY_DIR(MeshTying2D_cp_small
@@ -70,13 +57,8 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
     )
 
   TRIBITS_ADD_EXECUTABLE(
-    MeshTyingBlocked_NodeBased_3dof
-    SOURCES MeshTyingBlocked_NodeBased_3dof.cpp
-    COMM serial mpi
-    )#//
-  TRIBITS_ADD_EXECUTABLE(
-    MeshTyingBlocked_NodeBased_3dof_2
-    SOURCES MeshTyingBlocked_NodeBased_3dof_2.cpp
+    MeshTyingBlocked_NodeBased_3dualDofs
+    SOURCES MeshTyingBlocked_NodeBased_3dualDofs.cpp
     COMM serial mpi
     )
 
@@ -125,19 +107,21 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
     COMM serial mpi
     NUM_MPI_PROCS 1
   )
+
   TRIBITS_ADD_TEST(
-    MeshTyingBlocked_NodeBased_3dof
-    NAME "MeshTyingBlocked_NodeBased_simpleSmoother_3dof"
+    MeshTyingBlocked_NodeBased_3dualDofs
+    NAME "MeshTyingBlocked_NodeBased_simpleSmoother_3dualDofs"
     ARGS "-linAlgebra=Tpetra"
     COMM serial mpi
     NUM_MPI_PROCS 1
-  )#//
- TRIBITS_ADD_TEST(
-    MeshTyingBlocked_NodeBased_3dof_2
-    NAME "MeshTyingBlocked_NodeBased_simpleSmoother_3dof_2"
+  )
+
+  TRIBITS_ADD_TEST(
+    MeshTyingBlocked_NodeBased_3dualDofs
+    NAME "MeshTyingBlocked_NodeBased_simpleSmoother_3dualDofs"
     ARGS "-linAlgebra=Tpetra"
     COMM serial mpi
-    NUM_MPI_PROCS 1
+    NUM_MPI_PROCS 4
   )
 
 ENDIF()
