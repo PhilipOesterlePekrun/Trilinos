@@ -68,18 +68,24 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
 
   RCP<const Teuchos::Comm<int>> comm = Teuchos::DefaultComm<int>::getComm();
   
-  const GO numGlobalDofsPrimal = 3072;
-  const GO numGlobalDofsDual = 192;
+  const GO numGlobalDofsPrimal = 480;
+  const GO numGlobalDofsDual = 48;
   const GO numGlobalDofsTotal = numGlobalDofsPrimal + numGlobalDofsDual;
   const int numPrimalDofsPerNode = 3;
   const int numDualDofsPerNode = 3;
   const GO numGlobalNodesPrimal = numGlobalDofsPrimal / numPrimalDofsPerNode;
 
   const std::string xmlFile                  = "simple_3dof.xml";
-  const std::string matrixFileName           = "MeshTyingBlocked_NodeBased_3dualDofs_matrix.mm";
+
+  /*const std::string matrixFileName           = "MeshTyingBlocked_NodeBased_3dualDofs_matrix.mm";
   const std::string rhsFileName              = "MeshTyingBlocked_NodeBased_3dualDofs_rhs.mm";
   const std::string nullspace1FileName       = "MeshTyingBlocked_NodeBased_3dualDofs_nullspace1.mm";
-  const std::string lagr2DofFileName         = "Lagr2Dof_3dof.txt";
+  const std::string lagr2DofFileName         = "Lagr2Dof_3dof.txt";*/
+  
+  const std::string matrixFileName           = "GEN_matrix.mm";
+  const std::string rhsFileName              = "GEN_rhs.mm";
+  const std::string nullspace1FileName       = "GEN_ns1.mm";
+  const std::string lagr2DofFileName         = "GEN_Lagr2Dofs.txt";
 
   std::map<GO, GO> lagr2Dof;
   std::map<LO, LO> myLagr2Dof;
@@ -147,13 +153,13 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   // Transform the primal and dual maps into strided maps
   std::vector<size_t> stridingInfoPrimal;
   stridingInfoPrimal.push_back(numPrimalDofsPerNode);
-  RCP<const StridedMap> stidedPrimalXMap = StridedMapFactory::Build(primalXMap, stridingInfoPrimal);
+  RCP<const StridedMap> stridedPrimalXMap = StridedMapFactory::Build(primalXMap, stridingInfoPrimal);
 
   std::vector<size_t> stridingInfoDual;
   stridingInfoDual.push_back(numDualDofsPerNode);
   RCP<const StridedMap> stridedDualXMap = StridedMapFactory::Build(dualXMap, stridingInfoDual);
 
-  std::vector<RCP<const Map>> xsubmaps = {stidedPrimalXMap, stridedDualXMap};
+  std::vector<RCP<const Map>> xsubmaps = {stridedPrimalXMap, stridedDualXMap};
 
   // Construct the blocked map with Xpetra-style indexing
   RCP<const BlockedMap> blockedMap = rcp(new BlockedMap(fullXMap, xsubmaps, false));
@@ -192,6 +198,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   hierarchy->SetDefaultVerbLevel(MueLu::Extreme);
   hierarchy->GetLevel(0)->Set("A", Teuchos::rcp_dynamic_cast<Matrix>(blockedMatrix));
   hierarchy->GetLevel(0)->Set("Nullspace1", nullspace1);
+  hierarchy->GetLevel(0)->Set("Nullspace2", nullspace2);
   hierarchy->GetLevel(0)->Set("DualNodeID2PrimalNodeID",
     Teuchos::rcp_dynamic_cast<std::map<int, int>>(Teuchos::rcpFromRef(myLagr2Dof), true));
 
@@ -209,7 +216,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   RCP<blockStatusTestClass> primalBlockStatusTest = rcp(new blockStatusTestClass(bTol, 0));
   RCP<blockStatusTestClass> dualBlockStatusTest   = rcp(new blockStatusTestClass(bTol, 1));
 
-  RCP<StatusTestComboClass> statusTestCombo = rcp(new StatusTestComboClass(StatusTestComboClass::SEQ));
+  RCP<StatusTestComboClass> statusTestCombo = rcp(new StatusTestComboClass(StatusTestComboClass::AND));
   statusTestCombo->addStatusTest(primalBlockStatusTest);
   statusTestCombo->addStatusTest(dualBlockStatusTest);
 
@@ -217,10 +224,11 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   belosParams->set("Flexible Gmres", false);
   belosParams->set("Num Blocks", 100);
   belosParams->set("Convergence Tolerance", tol);
-  belosParams->set("Maximum Iterations", 100);
+  belosParams->set("Maximum Iterations", 1000);
   belosParams->set("Verbosity", 33);
   belosParams->set("Output Style", 1);
   belosParams->set("Output Frequency", 1);
+  ////belosParams->set("Implicit Residual Scaling", "Norm of Preconditioned Initial Residual");
 
   using BLinProb    = Belos::LinearProblem<SC, MultiVector, OP>;
   RCP<OP> belosOp   = rcp(new Belos::XpetraOp<Scalar, LocalOrdinal, GlobalOrdinal, Node>(blockedMatrix));
