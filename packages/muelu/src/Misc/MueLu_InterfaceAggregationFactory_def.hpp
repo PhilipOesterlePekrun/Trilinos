@@ -94,6 +94,9 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
                                                                                                      Level &currentLevel) const {
   using Dual2Primal_type = std::map<LocalOrdinal, LocalOrdinal>;
 
+  //if(currentLevel.GetLevelID()%2==0){
+    //std::cout<<"LINE 98; IF; LEVEL="<<currentLevel.GetLevelID()<<"\n";
+
   const ParameterList &pL = GetParameterList();
 
   RCP<const Matrix> A                   = Get<RCP<Matrix>>(currentLevel, "A");
@@ -101,6 +104,7 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   TEUCHOS_TEST_FOR_EXCEPTION(numDofsPerDualNode < Teuchos::ScalarTraits<LocalOrdinal>::one(), Exceptions::InvalidArgument,
                              "Number of dual DOFs per node < 0 (default value). Specify a valid \"number of DOFs per dual node\" in the parameter list for the InterfaceAggregationFactory.");
 
+  ///RCP<const Aggregates> primalAggregates          = Get<RCP<Aggregates>>(currentLevel, "Aggregates");
   RCP<const Aggregates> primalAggregates          = Get<RCP<Aggregates>>(currentLevel, "Aggregates");
   ArrayRCP<const LocalOrdinal> primalVertex2AggId = primalAggregates->GetVertex2AggId()->getData(0);
 
@@ -210,6 +214,17 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   Set(currentLevel, "CoarseDualNodeID2PrimalNodeID", coarseMapNodesDualToPrimal);
   Set(currentLevel, "UnAmalgamationInfo", dualAmalgamationInfo);
   GetOStream(Statistics1) << dualAggregates->description() << std::endl;
+  //dualAggregates_=dualAggregates;
+  //coarseMapNodesDualToPrimal_=coarseMapNodesDualToPrimal;
+  //dualAmalgamationInfo_=dualAmalgamationInfo;
+  /*}
+  else{
+    std::cout<<"LINE 217; ELSE; LEVEL="<<currentLevel.GetLevelID()<<"\n";
+    Set(currentLevel, "Aggregates", dualAggregates_);
+    Set(currentLevel, "CoarseDualNodeID2PrimalNodeID", coarseMapNodesDualToPrimal_);
+    Set(currentLevel, "UnAmalgamationInfo", dualAmalgamationInfo_);
+    GetOStream(Statistics1) << dualAggregates_->description() << std::endl;
+  }*/
 }  // BuildBasedOnNodeMapping
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>

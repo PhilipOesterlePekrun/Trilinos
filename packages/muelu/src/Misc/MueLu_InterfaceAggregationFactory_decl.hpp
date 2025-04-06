@@ -127,6 +127,10 @@ class InterfaceAggregationFactory : public SingleLevelFactoryBase {
    * @param[in/out] currentLevel Level on which the aggregation needs to be performed
    */
   void BuildBasedOnPrimalInterfaceDofMap(const std::string& prefix, Level& currentLevel) const;
+
+  //mutable RCP<Aggregates> dualAggregates_;
+  //mutable RCP<std::map<int, int>> coarseMapNodesDualToPrimal_;
+  //mutable RCP<AmalgamationInfo> dualAmalgamationInfo_;
 };
 
 }  // namespace MueLu
