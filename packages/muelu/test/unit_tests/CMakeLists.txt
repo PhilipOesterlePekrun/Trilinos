@@ -76,6 +76,7 @@ APPEND_SET(SOURCES
   PermutationFactory.cpp
   RigidBodyModeFactory.cpp
   ML2MueLuParameterTranslator.cpp
+  InterfaceAggregationFactory.cpp
 )
 
 APPEND_SET(SOURCES_INTREPID2

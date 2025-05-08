@@ -32,17 +32,17 @@
 #include <Xpetra_MatrixUtils.hpp>
 
 template <typename GlobalOrdinal>
-void read_Lagr2Dof(std::string filemane, std::map<GlobalOrdinal, GlobalOrdinal> &lagr2Dof) {
-  std::fstream lagr2DofFile;
-  lagr2DofFile.open(filemane);
-  TEUCHOS_ASSERT(lagr2DofFile.is_open())
+void read_dual2Primal(std::string filemane, std::map<GlobalOrdinal, GlobalOrdinal> &dual2Primal) {
+  std::fstream dual2PrimalFile;
+  dual2PrimalFile.open(filemane);
+  TEUCHOS_ASSERT(dual2PrimalFile.is_open())
 
   GlobalOrdinal key;
   GlobalOrdinal value;
-  while (lagr2DofFile >> key >> value) {
-    lagr2Dof[key] = value;
+  while (dual2PrimalFile >> key >> value) {
+    dual2Primal[key] = value;
   }
-  lagr2DofFile.close();
+  dual2PrimalFile.close();
 }
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
@@ -79,11 +79,11 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   const std::string matrixFileName     = "MeshTyingBlocked_NodeBased_3dualDofs_matrix.mm";
   const std::string rhsFileName        = "MeshTyingBlocked_NodeBased_3dualDofs_rhs.mm";
   const std::string nullspace1FileName = "MeshTyingBlocked_NodeBased_3dualDofs_nullspace1.mm";
-  const std::string lagr2DofFileName   = "Lagr2Dof_3dof.txt";
+  const std::string dual2PrimalFileName   = "dual2Primal_3dof.txt";
 
-  std::map<GO, GO> lagr2Dof;
-  std::map<LO, LO> myLagr2Dof;
-  read_Lagr2Dof<GO>(lagr2DofFileName, lagr2Dof);
+  std::map<GO, GO> dual2Primal;
+  std::map<LO, LO> myDual2Primal;
+  read_dual2Primal<GO>(dual2PrimalFileName, dual2Primal);
 
   // Construct the necessary maps to construct the blocked map
   RCP<const tpetra_map_type> primalNodeMap = Tpetra::createUniformContigMapWithNode<LocalOrdinal, GlobalOrdinal, Node>(numGlobalNodesPrimal, comm);
@@ -104,7 +104,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
 
   size_t numMyDualDofs = 0;
 
-  for (auto i = lagr2Dof.begin(); i != lagr2Dof.end(); ++i)
+  for (auto i = dual2Primal.begin(); i != dual2Primal.end(); ++i)
     if (primalMap->isNodeGlobalElement(numPrimalDofsPerNode * (i->second)))
       ++numMyDualDofs;
 
@@ -118,21 +118,21 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   for (size_t i = 0; i < numMyPrimalDofs; ++i)
     myDofs[i] = myPrimalDofs[i];
 
-  /* Choose the elements of the primal map, dual map, and of the dual to primal node mapping (myLagr2Dof)
+  /* Choose the elements of the primal map, dual map, and of the dual to primal node mapping (myDual2Primal)
    *
    * - The ownership of the primal and dual maps must be chosen such that any pair of dual and primal
-   *   indices from the lagr2Dof mapping are owned by the same process
-   * - The myLagr2Dof mapping is then also distributed in the same way
+   *   indices from the dual2Primal mapping are owned by the same process
+   * - The myDual2Primal mapping is then also distributed in the same way
    */
   current_i = 0;
-  for (auto i = lagr2Dof.begin(); i != lagr2Dof.end(); ++i)
+  for (auto i = dual2Primal.begin(); i != dual2Primal.end(); ++i)
     if (primalMap->isNodeGlobalElement(numPrimalDofsPerNode * (i->second))) {
       for (size_t j = 0; j < numDualDofsPerNode; ++j) {
         myDualDofs[numDualDofsPerNode * current_i + j]               = numGlobalDofsPrimal + (i->first) * numDualDofsPerNode + j;
         myDofs[numMyPrimalDofs + numDualDofsPerNode * current_i + j] = numGlobalDofsPrimal + (i->first) * numDualDofsPerNode + j;
       }
       GO primalDof          = numPrimalDofsPerNode * (i->second);
-      myLagr2Dof[current_i] = primalMap->getLocalElement(primalDof) / numPrimalDofsPerNode;
+      myDual2Primal[current_i] = primalMap->getLocalElement(primalDof) / numPrimalDofsPerNode;
       ++current_i;
     }
 
@@ -192,7 +192,7 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
   hierarchy->GetLevel(0)->Set("A", Teuchos::rcp_dynamic_cast<Matrix>(blockedMatrix));
   hierarchy->GetLevel(0)->Set("Nullspace1", nullspace1);
   hierarchy->GetLevel(0)->Set("DualNodeID2PrimalNodeID",
-                              Teuchos::rcp_dynamic_cast<std::map<int, int>>(Teuchos::rcpFromRef(myLagr2Dof), true));
+                              Teuchos::rcp_dynamic_cast<std::map<int, int>>(Teuchos::rcpFromRef(myDual2Primal), true));
 
   mueLuFactory.SetupHierarchy(*hierarchy);
 

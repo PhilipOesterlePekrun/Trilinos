@@ -25,7 +25,7 @@ IF(${PACKAGE_NAME}_ENABLE_Ifpack2 AND
       MeshTyingBlocked_NodeBased_3dualDofs_matrix.mm
       MeshTyingBlocked_NodeBased_3dualDofs_rhs.mm
       MeshTyingBlocked_NodeBased_3dualDofs_nullspace1.mm
-      Lagr2Dof_3dof.txt
+      dual2Primal_3dof.txt
       simple_3dof.xml
     )
 

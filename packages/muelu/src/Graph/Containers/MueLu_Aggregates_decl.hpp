@@ -254,6 +254,13 @@ class Aggregates : public BaseClass {
     unaggregated contains the list of nodes which are, for whatever reason, not aggregated (e.g. Dirichlet)
    */
   void ComputeNodesInAggregate(LO_view& aggPtr, LO_view& aggNodes, LO_view& unaggregated) const;
+  
+  /*! @brief List all aggregates and their nodes
+  @param out [in] Output stream to be used for printing
+  @param useGlobalNodeIds [in] Identify nodes by global IDs (if true, default) or local IDs (if false)
+  \warning Use this for debugging only, as this will generate a ton of screen output.
+  */
+  void PrintAllNodesPerAggregate(Teuchos::FancyOStream& out, bool useGlobalNodeIds = true) const;//#
 
   //! Get global number of aggregates
   //  If # of global aggregates is unknown, this method does coummunication and internally record the value
