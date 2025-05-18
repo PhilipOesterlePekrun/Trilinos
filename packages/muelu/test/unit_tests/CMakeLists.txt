@@ -79,6 +79,28 @@ APPEND_SET(SOURCES
   InterfaceAggregationFactory.cpp
 )
 
+#//#
+SET(SOURCE_INTERFACEAGGMINE "")
+APPEND_SET(SOURCE_INTERFACEAGGMINE
+  InterfaceAggregationFactory.cpp
+  MueLu_UnitTests.cpp
+  MueLu_TestHelpers.cpp
+)
+TRIBITS_ADD_EXECUTABLE(
+      UnitTestInterfaceAgg
+      SOURCES ${SOURCE_INTERFACEAGGMINE}
+      COMM serial mpi
+      )
+TRIBITS_ADD_TEST(
+    UnitTestInterfaceAgg
+    NAME "UnitTestInterfaceAgg"
+    ARGS "--linAlgebra=Tpetra"
+    PASS_REGULAR_EXPRESSION "End Result: TEST PASSED"
+    NUM_MPI_PROCS 1
+    COMM serial mpi
+    RUN_SERIAL
+    )
+
 APPEND_SET(SOURCES_INTREPID2
   MueLu_UnitTests.cpp
   MueLu_TestHelpers.cpp

@@ -130,7 +130,9 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
     auto comm                              = operatorRangeMap->getComm();
     std::vector<GlobalOrdinal> myDualNodes = {};
 
+    // (note that (A01->getDomainMap() == A11->getDomainMap()) and (A01->getRangeMap() == A00->getRangeMap()))
     for (size_t i = 0; i < operatorRangeMap->getLocalNumElements(); i++) {
+      std::cout<<"\tInterfaceAggFact, line 135; i = "<<i<<"\n";
       GlobalOrdinal gDualDofId  = operatorRangeMap->getGlobalElement(i);
       GlobalOrdinal gDualNodeId = AmalgamationFactory::DOFGid2NodeId(gDualDofId, numDofsPerDualNode, dualDofOffset, 0);
       myDualNodes.push_back(gDualNodeId);
