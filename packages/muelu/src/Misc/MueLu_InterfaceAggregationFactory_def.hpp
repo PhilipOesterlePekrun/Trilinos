@@ -230,8 +230,7 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   // Copy setting from primal aggregates, as we copy the interface part of primal aggregates anyways
   dualAggregates->AggregatesCrossProcessors(primalAggregates->AggregatesCrossProcessors());
   
-  std::cout<<"primalAggregates->AggregatesCrossProcessors()"<<primalAggregates->AggregatesCrossProcessors()<<std::endl;//#
-
+  // Empty initializations
   ArrayRCP<LocalOrdinal> dualVertex2AggId = dualAggregates->GetVertex2AggId()->getDataNonConst(0);
   ArrayRCP<LocalOrdinal> dualProcWinner   = dualAggregates->GetProcWinner()->getDataNonConst(0);
 

@@ -47,93 +47,76 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
 #include "MueLu_UseShortNames.hpp"
   MUELU_TESTING_SET_OSTREAM;
   MUELU_TESTING_LIMIT_SCOPE(Scalar, GlobalOrdinal, Node);
+  using ST = Teuchos::ScalarTraits<int>;
+  using device_type = typename Node::device_type;
+  using LO_view = Kokkos::View<LocalOrdinal *, device_type>;
+  
   out << "version: " << MueLu::Version() << std::endl;
-  
-  RCP<Teuchos::FancyOStream> outfs = Teuchos::fancyOStream(rcpFromRef(std::cout));
-  
-  //# Xpetra::UseTpetra or Xpetra::UseEpetra
-  auto lib = TestHelpers::Parameters::getLib();
-  ///auto lib = Xpetra::UseTpetra;
-  
-  RCP<const Teuchos::Comm<int> > comm = Parameters::getDefaultComm();
-  
-  /*
-  Level level, coarseLevel;
-  TestHelpers::TestFactory<Scalar, LO, GO, NO>::createTwoLevelHierarchy(level, coarseLevel);
-  RCP<const Teuchos::Comm<int> > comm = Parameters::getDefaultComm();
-
-  GO nx = 2, ny = 3, nz = 4, mx = comm->getSize(), my = 1, mz = 1;
-  ;
-  LO blkSize = 3;
-  Teuchos::ParameterList matrixList;
-  matrixList.set("nx", nx);
-  matrixList.set("ny", ny);
-  matrixList.set("nz", nz);
-  matrixList.set("mx", mx);
-  matrixList.set("my", my);
-  matrixList.set("mz", mz);
-  matrixList.set("matrixType", "Elasticity3D");
-  RCP<Matrix> Op = TestHelpers::TestFactory<Scalar, LO, GO, NO>::BuildMatrix(matrixList, TestHelpers::Parameters::getLib());
-  Op->SetFixedBlockSize(blkSize);
-  */
-
-  //level.Set("A", Op);
-
-  
-  
-  //idea: give the rowmap of A11 explicitly. Also give the range map of A12 explicitly because this is directly used in the BuildBasedOnNodeMapping function (you can prescribe the range map, no problem there)
-  
-  //RCP<Matrix> A = TestHelpers::TestFactory<SC, LO, GO, NO>::Build1DPoisson(nnodePrimal*ndofnPrimal);
-  //A->SetFixedBlockSize(ndofnPrimal);
-  //level.Set("A", A);
   
   Level level;
   // Set level ID so 0 so that we can build with our provided mapping
   level.SetLevelID(0);
   
-  constexpr GO nx = 5, ny = 15;
+  auto lib = TestHelpers::Parameters::getLib();
+  RCP<const Teuchos::Comm<int> > comm = Parameters::getDefaultComm();
+  int rank = comm->getRank();
+  int commSize = comm->getSize();
   
   Teuchos::ParameterList matrixList;
-  // geometry
+  // Geometry
+  // We choose random problem dimensions of nx in [5,10] and ny in [10,30]
+  GO nx, ny;
+  if(rank == 0) {
+    nx = 5 + ST::random() % 6;
+    ny = 10 + ST::random() % 21;
+  }
+  Teuchos::broadcast(*comm, 0, &nx);
+  Teuchos::broadcast(*comm, 0, &ny);
   matrixList.set("nx", nx);
   matrixList.set("ny", ny);
-  // procs
+  
+  // Distribution
   matrixList.set("mx", 1);
-  matrixList.set("my", comm->getSize());
+  matrixList.set("my", commSize);
   matrixList.set("matrixType", "Elasticity2D");
   
-  constexpr GO indexBase = 0,
-    // ndofn = number of dofs per node
-    ndofnPrimal = 2, ndofnDual = 2;
+  // ndofn = number of dofs (degrees of freedom) per node
+  constexpr GO ndofnPrimal = 2;
   // nnode = number of nodes
-  // - if not my, then global
   const GO nnodePrimal = nx*ny;
   LO mynnodePrimal; // maybe can be const, same for below //#
-  constexpr GO nnodeDual = 20;
-  LO mynnodeDual;
-  // ndof = number of dofs
   const GO ndofPrimal = ndofnPrimal*nnodePrimal;
   LO myndofPrimal;
+  
+  // We choose a random ndofn in [1,3] and a random nnode in [15,25] for the dual (interface) field
+  GO ndofnDual;
+  GO nnodeDual;
+  if(rank == 0) {
+    ndofnDual = 1 + ST::random() % 3;
+    nnodeDual = 15 + ST::random() % 11;
+  }
+  Teuchos::broadcast(*comm, 0, &ndofnDual);
+  Teuchos::broadcast(*comm, 0, &nnodeDual);
+  
+  LO mynnodeDual;
   const GO ndofDual = ndofnDual*nnodeDual;
   LO myndofDual;
   
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  // //# here i take a lot from framework test to make the contigdof map respecting node ownership and also make the striding maps and all that
   
-  using Dual2Primal = std::map<LO, LO>;
   
-  RCP<Dual2Primal> dual2Primal = rcp(new Dual2Primal());
   
-  // Supply the global dual node to primal node mapping
-  // Here we use a partial identity mapping (assume nnodeDual < nnodePrimal)
-  for (LO i = 0; i < nnodeDual; ++i) {
-    (*dual2Primal)[i] = i;
+  
+  
+  // Supply a random, injective global dual to primal mapping
+  RCP<Array<GO>> dual2Primal = rcp(new Teuchos::Array<GO>(nnodeDual));
+  if(rank == 0) {
+    Array<GO> primalCandidates = {};
+    for (GO i = 0; i < nnodePrimal; ++i)
+      primalCandidates.push_back(i);
+    for (GO dualNodeGID = 0; dualNodeGID < nnodeDual; ++dualNodeGID)
+      dual2Primal->at(dualNodeGID) = primalCandidates.at(ST::random() % nnodePrimal - 1 - dualNodeGID);
   }
+  Teuchos::broadcast(*comm, 0, nnodeDual, dual2Primal->getRawPtr());
   
   // // primal
   // Primal row map is uniform contiguous; nothing fancy
@@ -142,8 +125,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
   // With global indexing, but this is implied by being GO //#(do this everywhere for consistency)
   ArrayView<const GO> myPrimalNodes = nodeRowMap1->getLocalElementList();
   ///myPrimalNodes.describe(out);//# use better printing or write to files by proc
-  mynnodePrimal = nodeRowMap1->getLocalNumElements();
-  myndofPrimal  = nnodePrimal * ndofnPrimal;
+  mynnodePrimal = nodeRowMap1->getLocalNumElements();//##delete if not needed
   
   //# technically the dual node map creation could go here
 
@@ -154,143 +136,75 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
     MueLu::Utils2::helper_buildStridedDofMapFromNodeMap(nodeRowMap1, ndofnPrimal), true);
     
   ArrayView<const GO> myPrimalDofs = dofRowMap1->getLocalElementList();
-  dofRowMap1->describe(*outfs, Teuchos::VERB_EXTREME);//#
+  //#dofRowMap1->describe(*outfs, Teuchos::VERB_EXTREME);//#
   // // myDual2Primal and dual map
   Array<GO> myDualNodes;
   
-  RCP<Dual2Primal> myDual2Primal = rcp(new Dual2Primal());
+  RCP<std::map<LO, LO>> myDual2Primal = rcp(new std::map<LO, LO>());
   mynnodeDual = 0;
   //# it = iterator. *it is the ref to iterator, ie iterator&. then, to get the std pair from iterator,
-  for (auto it = dual2Primal->begin(); it != dual2Primal->end(); ++it) {
-    GO primalGID = it->second;
+  for (GO dualNodeGID = 0; dualNodeGID < nnodeDual; ++dualNodeGID) {
+    GO primalGID = dual2Primal->at(dualNodeGID);
     if (nodeRowMap1->isNodeGlobalElement(primalGID)) {
-      //myDual2Primal->emplace(*it); //# or &(*it)? //# this would do global to global
       (*myDual2Primal)[mynnodeDual] = nodeRowMap1->getLocalElement(primalGID);
-      myDualNodes.push_back(it->first);
+      myDualNodes.push_back(dualNodeGID);
       ++mynnodeDual;
     }
   }
   
   RCP<const Map> nodeRowMap2 = Xpetra::MapFactory<LO, GO, NO>::Build(
-    lib, nnodeDual, myDualNodes, indexBase, comm);
+    lib, nnodeDual, myDualNodes, 0, comm);
 
   RCP<const Map> dofRowMap2 = MueLu::Utils2::helper_buildStridedDofMapFromNodeMap(nodeRowMap2, ndofnDual);
   ArrayView<const GO> myDualDofs = dofRowMap2->getLocalElementList();
-  ///myDualDofs->describe(out);//#
-  myndofDual = mynnodeDual*ndofnDual;
-  
-  dofRowMap2->describe(*outfs, Teuchos::VERB_EXTREME);//#
+  myndofDual = mynnodeDual*ndofnDual;//##delete if not needed
 
-  // // Make matrices
-  // Preliminary because TestFactory doesn't give striding or respect node ownership
-  ///RCP<Matrix> A00prelim = TestHelpers::TestFactory<SC, LO, GO, NO>::BuildMatrix(matrixList, lib); // this function constructs a row map and calls fillComplete() already; however, the row map is not strided...I don't know why honestly, but ok we change that here
-  
-  /*
-  RCP<Matrix> A00 = Teuchos::make_rcp<Xpetra::CrsMatrixWrap<SC, LO, GO, NO>>
-    (Xpetra::CrsMatrixFactory<SC, LO, GO, NO>::Build(dofRowMap1, 0));
-  auto exporter = Xpetra::ExportFactory<LO, GO, NO>::Build(A00prelim->getRowMap(), dofRowMap1);
-  A00->doExport(*A00prelim, *exporter, Xpetra::INSERT);
-  A00->fillComplete();//#dofRowMap1, dofRowMap1);
-  */
-  //# actually uses rowmap as rangemap, colmap as domainmap by default with empty args
-  ////std::cout<<"\t"<<"typeid(exporter) = "<<typeid(exporter)<<"\n";
-  //# alt to above:
   RCP<Galeri::Xpetra::Problem<Map, CrsMatrixWrap, MultiVector> > Pr =
-        Galeri::Xpetra::BuildProblem<SC, LO, GO, Map, CrsMatrixWrap, MultiVector>(matrixList.get("matrixType", "Laplace1D"), dofRowMap1, matrixList);
-    RCP<Matrix> A00 = Pr->BuildMatrix();
-    
-    ///A00->resumeFill();
-    ///A00->fillComplete(dofRowMap1, dofRowMap1);
-    ///A00->CreateView("stridedMaps", dofRowMap1, A00->getColMap());
-    A00->SetFixedBlockSize(ndofnPrimal);
-    
-    ////A00->CreateView("stridedMaps",
-        /////      dofRowMap1,     // range map
-             //// dofRowMap1);     // domain map
-
-  std::cout<<"test line 253:"<<matrixList.get("matrixType", "Laplace1D")<<"\n";
+        Galeri::Xpetra::BuildProblem<SC, LO, GO, Map, CrsMatrixWrap, MultiVector>(matrixList.get("matrixType", ""), dofRowMap1, matrixList);
+  RCP<Matrix> A00 = Pr->BuildMatrix();
+  A00->SetFixedBlockSize(ndofnPrimal);
     
   RCP<Matrix> A11 = Teuchos::make_rcp<Xpetra::CrsMatrixWrap<SC, LO, GO, NO>>
     (Xpetra::CrsMatrixFactory<SC, LO, GO, NO>::Build(dofRowMap2, 0));
-  // Note: for BuildBasedOnNodeMapping, the only map from A11 that is used is the rangemap
-  
   A11->fillComplete(dofRowMap2, dofRowMap2);
   A11->SetFixedBlockSize(ndofnPrimal);
   
-  // // Make nullspace1
-  //# The true null space of the matrix is not necessary if we already have striding?? ??
-  LO NS1dim = 2;
+  // The true null space is not necessary
+  LO NS1dim = ndofnPrimal;
   RCP<MultiVector> nullspace1 = MultiVectorFactory::Build(dofRowMap1, NS1dim);
   nullspace1->randomize();
   
-  //#A11->getRangeMap()->describe(out, Teuchos::VERB_EXTREME);//#
-  
-  // // Assign for uncoupled aggregation
-  
-  level.Set("Nullspace", nullspace1);
-  
+  // Primal aggregation
   level.Set("A", A00);
   level.Set("nullspace1", nullspace1);
-  
-  
-  
-  
-/////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////
-  
-  
   
   RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
   RCP<CoalesceDropFactory> dropFact  = rcp(new CoalesceDropFactory());
   dropFact->SetFactory("UnAmalgamationInfo", amalgFact);
 
-  RCP<UncoupledAggregationFactory> UncoupledAggFact = rcp(new UncoupledAggregationFactory());
-  UncoupledAggFact->SetFactory("Graph", dropFact);
-  UncoupledAggFact->SetFactory("Graph", dropFact);
-  UncoupledAggFact->SetFactory("DofsPerNode", dropFact);
-  ///UncoupledAggFact->SetParameter("DofsPerNode", Teuchos::ParameterEntry(Teuchos::as<LO>(ndofnPrimal))); //# I cant just set this? What?
+  RCP<UncoupledAggregationFactory> uncoupledAggFact = rcp(new UncoupledAggregationFactory());
+  uncoupledAggFact->SetFactory("Graph", dropFact);
+  uncoupledAggFact->SetFactory("Graph", dropFact);
+  uncoupledAggFact->SetFactory("DofsPerNode", dropFact);
   level.Set("DofsPerNode", ndofnPrimal);
 
-  UncoupledAggFact->SetMinNodesPerAggregate(7);
-  ///UncoupledAggFact->SetMaxNodesPerAggregate(10);
-  ///UncoupledAggFact->SetMaxNeighAlreadySelected(0);
-  UncoupledAggFact->SetOrdering("natural");
+  /////uncoupledAggFact->SetMinNodesPerAggregate(7);
+  uncoupledAggFact->SetOrdering("natural");
 
-  // request input for BlockedCoarseMapFactory by hand
-  level.Request("Aggregates", UncoupledAggFact.get());
-  UncoupledAggFact->Build(level);
+  level.Request("Aggregates", uncoupledAggFact.get());
+  uncoupledAggFact->Build(level);
 
   // access aggregates
-  RCP<Aggregates> primalAggs         = level.Get<RCP<Aggregates>>("Aggregates", UncoupledAggFact.get());
-  GO numAggs                         = primalAggs->GetNumAggregates();
-
-  
+  RCP<Aggregates> primalAggs         = level.Get<RCP<Aggregates>>("Aggregates", uncoupledAggFact.get()); //# i would test non-null here but its not really the job of this test to test uncoupledAggFact
   
   // Set params
   RCP<InterfaceAggregationFactory> interfaceAggFact = rcp(new InterfaceAggregationFactory());
-  //RCP<const Teuchos::ParameterList> interfaceAggFactParamList = interfaceAggFact->GetValidParameterList();
-  //auto nb = Teuchos::ParameterEntry();
-  //nb.setValue<std::string>()
-  interfaceAggFact->SetParameter("Dual/primal mapping strategy", Teuchos::ParameterEntry(std::string("node-based")));
-  //interfaceAggFact->SetParameter("DualNodeID2PrimalNodeID", Teuchos::ParameterEntry(dual2primal.get())); //# SetParameter is the same thing as SetFactory lol
-  level.Set("DualNodeID2PrimalNodeID", myDual2Primal);
-  interfaceAggFact->SetParameter("number of DOFs per dual node", Teuchos::ParameterEntry(Teuchos::as<LO>(ndofnDual))); //#this is fine
-  ////interfaceAggFact->SetParameter("A", Teuchos::rcp_dynamic_cast<Xpetra::Matrix<SC, LO, GO, NO>>(A11)); //#this is not; even if using Parameter, it stores by value and you dont input matrices like that
-  level.Set("A", A11);
-  ///Teuchos::rcp_dynamic_cast<Xpetra::Matrix<SC, LO, GO, NO>>(A11)
   
-  //level.Set("Dual/primal mapping strategy", "node-based");//"node-based");
-  //level.Set("DualNodeID2PrimalNodeID", dual2primal);
-  //level.Set("number of DOFs per dual node", Teuchos::as<LO>(2));
-  //level.Set("A", A11);
-
-  //interfaceAggFact->SetFactory("A",                       NoFactory::get());
-  interfaceAggFact->SetFactory("Aggregates",              UncoupledAggFact);
-  //interfaceAggFact->SetFactory("DualNodeID2PrimalNodeID", NoFactory::get());
+  interfaceAggFact->SetParameter("Dual/primal mapping strategy", Teuchos::ParameterEntry(std::string("node-based")));
+  interfaceAggFact->SetParameter("number of DOFs per dual node", Teuchos::ParameterEntry(Teuchos::as<LO>(ndofnDual)));
+  level.Set("DualNodeID2PrimalNodeID", myDual2Primal);
+  level.Set("A", A11);
+  interfaceAggFact->SetFactory("Aggregates", uncoupledAggFact);
   
   interfaceAggFact->Build(level);
 
@@ -299,6 +213,10 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
   level.Request("UnAmalgamationInfo", interfaceAggFact.get(), interfaceAggFact.get());
   
   RCP<Aggregates> dualAggs = level.Get<RCP<Aggregates>>("Aggregates", interfaceAggFact.get());
+  TEST_EQUALITY(dualAggs.is_null(), false);
+  
+  RCP<Aggregates> dualUnAmalgamationInfo = level.Get<RCP<Aggregates>>("UnAmalgamationInfo", interfaceAggFact.get());
+  TEST_EQUALITY(dualUnAmalgamationInfo.is_null(), false);
 
   // Test that the core idea is upheld, for both the current and the next coarser level //#
   //# btw, uncoupledaggregationfactory inherently has aggregatescrossprocessors==false (ofc this isnt the only type of aggregation factory for primal nodes, but we will just use this here then)
@@ -329,10 +247,79 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
   outfs->flush();
   */
  
-  std::cout<<"\tA00->GetFixedBlockSize();"<<A00->GetFixedBlockSize()<<std::endl;
-  std::cout<<"\tA11->GetFixedBlockSize();"<<A11->GetFixedBlockSize()<<std::endl;
+  std::cout<<"\tA00->GetFixedBlockSize();"<<A00->GetFixedBlockSize()<<std::endl;//#
+  std::cout<<"\tA11->GetFixedBlockSize();"<<A11->GetFixedBlockSize()<<std::endl;//#
   
-  MueLu::Utils2::writeInterleavedPerRank<LO, GO, NO>(comm, {"primalAggs", "dualAggs"}, {primalAggs, dualAggs});
+  MueLu::Utils2::writeInterleavedPerRank<LO, GO, NO>(comm, {"primalAggs", "dualAggs"}, {primalAggs, dualAggs});//#
+  /*
+  ArrayRCP<const LO> primalVertex2AggId_mapped = {};
+  
+  //#dualVertex2AggId[nodeID] returns aggID
+  for(LO dualNodeId = 0; dualNodeId < dualVertex2AggId->size(); ++dualNodeId) {
+    LO dualAggId = dualVertex2AggId[dualNodeId];
+    LO primalNodeId_mapped = myDual2Primal[dualNodeId];
+    primalVertex2AggId_mapped->insert(primalNodeId_mapped, primalVertex2AggID[primalNodeId_mapped]);
+  }
+  */
+  
+  
+  //////// new attempt:
+  // Formal check that the core idea (dual aggregates are the restriction of primal aggregates onto the interface) is upheld
+  // We do this by checking that the partial primal aggregates which are mapped back from the dual aggregates are a subset of the actual primal aggregates
+  
+  ArrayRCP<const LO> primalVertex2AggId = primalAggs->GetVertex2AggId()->getData(0);
+  ArrayRCP<const LO> dualVertex2AggId = dualAggs->GetVertex2AggId()->getData(0);
+  
+  bool aggStructureCheck = true;
+  
+  LO_view aggPtrPrimal;
+  LO_view aggNodesPrimal;
+  LO_view unaggregatedPrimal;
+  primalAggs->ComputeNodesInAggregate(aggPtrPrimal, aggNodesPrimal, unaggregatedPrimal);
+  
+  LO_view aggPtrDual;
+  LO_view aggNodesDual;
+  LO_view unaggregatedDual;
+  dualAggs->ComputeNodesInAggregate(aggPtrDual, aggNodesDual, unaggregatedDual);
+  
+  if(unaggregatedPrimal.size() != 0 || unaggregatedDual.size() != 0)
+    aggStructureCheck = false;
+  
+    //# maybe add another check with mynnodePrimal and mynnodeDual in here somewhere
+  const LO numDualAggs = dualAggs->GetNumAggregates();
+  for(LO dualAggId = 0; dualAggId < numDualAggs && aggStructureCheck; ++dualAggId) {
+    LO primalAggId_mapped = -2; // should not change from first iteration onwards
+    for (LO dualNodeId = aggPtrDual[dualAggId]; dualNodeId < aggPtrDual[dualAggId+1]; ++dualNodeId)
+    {
+      // sanity
+      if(myDual2Primal->find(dualNodeId) == myDual2Primal->end()) { //!contains
+        aggStructureCheck = false;
+        break;
+      }
+      LO primalNodeId_mapped = myDual2Primal->at(dualNodeId);
+      
+      if(primalNodeId_mapped >= primalVertex2AggId.size()) {
+        aggStructureCheck = false;
+        break;
+      }
+      LO primalAggId_mappedTmp = primalVertex2AggId[primalNodeId_mapped];
+      
+      // check that all of the corresponding primal nodes are also in the same aggregate
+      if(primalAggId_mapped == -2)
+        primalAggId_mapped = primalAggId_mappedTmp;
+      else if(primalAggId_mappedTmp != primalAggId_mapped) {
+        aggStructureCheck = false;
+        break;
+      }
+    }
+  }
+  
+  // i think sizes already ensured by above
+  
+  // Also check all sizes
+  //for all procs, for all aggs: primalaggsmapped.size() == dualaggs.size() == myDual2Primal.size()
+  bool aggAndMapSizesCheck = true;
+  //...
   
   TEST_EQUALITY(true, true);
 }
