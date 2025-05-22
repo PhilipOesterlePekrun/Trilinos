@@ -31,6 +31,8 @@
 #include <Xpetra_MapUtils.hpp>
 #include <Xpetra_MatrixUtils.hpp>
 
+#include "/home/oesterle/rd/Trilinos_Base/Trilinos/packages/muelu/src/Misc/MueLu_InterfaceAggregationFactory_def.hpp"//#debug
+
 template <typename GlobalOrdinal>
 void read_dual2Primal(std::string filemane, std::map<GlobalOrdinal, GlobalOrdinal> &dual2Primal) {
   std::fstream dual2PrimalFile;
@@ -123,7 +125,6 @@ int main_(Teuchos::CommandLineProcessor &clp, Xpetra::UnderlyingLib &lib, int ar
    * - The ownership of the primal and dual maps must be chosen such that any pair of dual and primal
    *   indices from the dual2Primal mapping are owned by the same process
    * - The myDual2Primal mapping is then also distributed in the same way
-   * - Hence, the initial primalMap decides the distribution of the other data (maps, mapping)
    */
   current_i = 0;
   for (auto i = dual2Primal.begin(); i != dual2Primal.end(); ++i)

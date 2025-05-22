@@ -23,6 +23,84 @@
 #include "MueLu_InterfaceAggregationFactory_decl.hpp"
 
 namespace MueLu {
+  
+namespace Utils2 {
+  
+template<class LocalOrdinal, class GlobalOrdinal, class Node>
+Teuchos::RCP<const Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node>>
+helper_buildStridedDofMapFromNodeMap(
+    const Teuchos::RCP<const Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node>>& nodeMap,
+    int dofsPerNode)
+{
+  using map_type = Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node>;
+  using GO = GlobalOrdinal;
+  using LO = LocalOrdinal;
+  using NO = Node;
+  using Teuchos::RCP;
+  using Teuchos::Array;
+  using Teuchos::ArrayView;
+
+  RCP<const Teuchos::Comm<int>> comm = nodeMap->getComm();
+  const GO indexBase = 0;
+
+  // Get local node GIDs owned by this processor
+  Teuchos::ArrayView<const GO> nodeGIDs = nodeMap->getLocalElementList();
+
+  std::vector<GO> dofGIDs;
+  dofGIDs.reserve(nodeGIDs.size() * dofsPerNode);
+  for (GO nodeID : nodeGIDs) {
+    for (int d = 0; d < dofsPerNode; ++d) {
+      dofGIDs.push_back(nodeID * dofsPerNode + d);
+    }
+  }
+
+  std::vector<size_t> stridingInfo;
+  stridingInfo.push_back(dofsPerNode);
+  
+  size_t numGlobalDofs = Teuchos::OrdinalTraits<Xpetra::global_size_t>::invalid();
+  int stridedBlockId = 0;
+  GO offset = 0;
+
+  auto dofMap = Xpetra::StridedMapFactory<LO, GO, Node>::Build(
+    nodeMap->lib(),
+    numGlobalDofs,
+    Teuchos::arrayViewFromVector(dofGIDs),
+    indexBase,
+    stridingInfo,
+    nodeMap->getComm(),
+    stridedBlockId,
+    offset
+  );
+
+
+
+  return dofMap;
+}
+
+template<class LocalOrdinal, class GlobalOrdinal, class Node>
+void writeInterleavedPerRank(
+    const Teuchos::RCP<const Teuchos::Comm<int>>& comm,
+    const std::vector<std::string>& descriptions,
+    const std::vector<Teuchos::RCP<const MueLu::Aggregates<LocalOrdinal, GlobalOrdinal, Node>>>& aggss, const std::string& prefix = "") {
+  int rank = comm->getRank();
+  std::ofstream outFile(prefix+"_unitTest_rank"+std::to_string(rank)+".txt");
+  
+  RCP<Teuchos::FancyOStream> outfs = Teuchos::fancyOStream(rcpFromRef(outFile));
+
+  for (std::size_t i = 0; i < descriptions.size(); ++i) {
+    outFile << "==== [" << i << "] " << descriptions[i] << " ====\n";
+    if (aggss[i] != Teuchos::null) {
+        aggss[i]->PrintAllNodesPerAggregate(*outfs, true);
+    } else {
+        outFile << "(null)\n";
+    }
+    outFile << "\n";
+  }
+
+  outFile.close();
+}
+}
+
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 RCP<const ParameterList> InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::GetValidParameterList() const {
@@ -103,7 +181,7 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
 
   RCP<const Aggregates> primalAggregates          = Get<RCP<Aggregates>>(currentLevel, "Aggregates");
   ArrayRCP<const LocalOrdinal> primalVertex2AggId = primalAggregates->GetVertex2AggId()->getData(0);
-
+  
   // Get the user-prescribed mapping of dual to primal node IDs
   RCP<Dual2Primal_type> mapNodesDualToPrimal;
   if (currentLevel.GetLevelID() == 0)
@@ -132,10 +210,10 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
 
     // (note that (A01->getDomainMap() == A11->getDomainMap()) and (A01->getRangeMap() == A00->getRangeMap()))
     for (size_t i = 0; i < operatorRangeMap->getLocalNumElements(); i++) {
-      std::cout<<"\tInterfaceAggFact, line 135; i = "<<i<<"\n";
       GlobalOrdinal gDualDofId  = operatorRangeMap->getGlobalElement(i);
       GlobalOrdinal gDualNodeId = AmalgamationFactory::DOFGid2NodeId(gDualDofId, numDofsPerDualNode, dualDofOffset, 0);
       myDualNodes.push_back(gDualNodeId);
+      std::cout<<"fact line 138, rank"<<comm->getRank()<<", i="<<i<<", gDualNodeId="<<gDualNodeId<<std::endl;
     }
 
     // remove all duplicates
@@ -151,6 +229,8 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
 
   // Copy setting from primal aggregates, as we copy the interface part of primal aggregates anyways
   dualAggregates->AggregatesCrossProcessors(primalAggregates->AggregatesCrossProcessors());
+  
+  std::cout<<"primalAggregates->AggregatesCrossProcessors()"<<primalAggregates->AggregatesCrossProcessors()<<std::endl;//#
 
   ArrayRCP<LocalOrdinal> dualVertex2AggId = dualAggregates->GetVertex2AggId()->getDataNonConst(0);
   ArrayRCP<LocalOrdinal> dualProcWinner   = dualAggregates->GetProcWinner()->getDataNonConst(0);
@@ -212,6 +292,11 @@ void InterfaceAggregationFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Bui
   Set(currentLevel, "CoarseDualNodeID2PrimalNodeID", coarseMapNodesDualToPrimal);
   Set(currentLevel, "UnAmalgamationInfo", dualAmalgamationInfo);
   GetOStream(Statistics1) << dualAggregates->description() << std::endl;
+  
+  //#
+  auto comm2                              = operatorRangeMap->getComm();
+  Utils2::writeInterleavedPerRank<LO, GO, NO>(comm2, {"primalAggs", "dualAggs"}, {primalAggregates, dualAggregates}, "InterfaceAggFactDef_level"+std::to_string(currentLevel.GetLevelID()));
+  //#
 }  // BuildBasedOnNodeMapping
 
 template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>

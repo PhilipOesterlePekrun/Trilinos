@@ -279,9 +279,10 @@ void UncoupledAggregationFactory<LocalOrdinal, GlobalOrdinal, Node>::Build(Level
           });
     }
   }
-
+std::cout<<"uncoupled line 282, what"<<std::endl;
   if (OnePtMap != Teuchos::null) {
     LO nDofsPerNode = Get<LO>(currentLevel, "DofsPerNode");
+    std::cout<<"uncoupled line 285, nDofsPerNode="<<nDofsPerNode<<std::endl;
 
     if (runOnHost) {
       GO indexBase = graph->GetDomainMap()->getIndexBase();
