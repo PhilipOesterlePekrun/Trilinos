@@ -104,19 +104,32 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
   
   
   
+  std::ofstream fileMainPerRank("outFilesPerRank/Main_UT_rank"+std::to_string(rank)+".txt");
   
+  RCP<Teuchos::FancyOStream> outFsMainPerRank = Teuchos::fancyOStream(rcpFromRef(fileMainPerRank));
   
-  
+  fileMainPerRank<<"------line111"<<std::endl;
   // Supply a random, injective global dual to primal mapping
-  RCP<Array<GO>> dual2Primal = rcp(new Teuchos::Array<GO>(nnodeDual));
+  RCP<Array<GO>> dual2Primal = rcp(new Teuchos::Array<GO>());
   if(rank == 0) {
     Array<GO> primalCandidates = {};
     for (GO i = 0; i < nnodePrimal; ++i)
       primalCandidates.push_back(i);
-    for (GO dualNodeGID = 0; dualNodeGID < nnodeDual; ++dualNodeGID)
-      dual2Primal->at(dualNodeGID) = primalCandidates.at(ST::random() % nnodePrimal - 1 - dualNodeGID);
+    for (GO dualNodeGID = 0; dualNodeGID < nnodeDual; ++dualNodeGID){
+      GO choose = ST::random() % (nnodePrimal - 1 - dualNodeGID);
+      fileMainPerRank<<"dualNodeGID, choose"<<dualNodeGID<<","<<choose<<std::endl;
+      dual2Primal->push_back(primalCandidates.at(choose));
+      fileMainPerRank<<"\tprimalCandidates.at(choose)"<<primalCandidates.at(choose)<<std::endl;
+      primalCandidates.erase(primalCandidates.begin() + choose);
+    }
   }
+  else
+    dual2Primal->resize(nnodeDual);
   Teuchos::broadcast(*comm, 0, nnodeDual, dual2Primal->getRawPtr());
+  
+  fileMainPerRank<<"------line127"<<std::endl;
+  for(GO i =0;i<nnodeDual;++i)
+    fileMainPerRank<<"\t"<<i<<","<<dual2Primal->at(i)<<std::endl;
   
   // // primal
   // Primal row map is uniform contiguous; nothing fancy
@@ -151,6 +164,11 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
       ++mynnodeDual;
     }
   }
+  
+  fileMainPerRank<<"------line167"<<std::endl;
+  for(GO i =0;i<myDual2Primal->size();++i)
+    fileMainPerRank<<"\t"<<i<<","<<myDual2Primal->at(i)<<std::endl;
+    
   
   RCP<const Map> nodeRowMap2 = Xpetra::MapFactory<LO, GO, NO>::Build(
     lib, nnodeDual, myDualNodes, 0, comm);
@@ -215,7 +233,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
   RCP<Aggregates> dualAggs = level.Get<RCP<Aggregates>>("Aggregates", interfaceAggFact.get());
   TEST_EQUALITY(dualAggs.is_null(), false);
   
-  RCP<Aggregates> dualUnAmalgamationInfo = level.Get<RCP<Aggregates>>("UnAmalgamationInfo", interfaceAggFact.get());
+  RCP<AmalgamationInfo> dualUnAmalgamationInfo = level.Get<RCP<AmalgamationInfo>>("UnAmalgamationInfo", interfaceAggFact.get());
   TEST_EQUALITY(dualUnAmalgamationInfo.is_null(), false);
 
   // Test that the core idea is upheld, for both the current and the next coarser level //#
@@ -267,61 +285,114 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(InterfaceAggregationFactory, BuildBasedOnNodeM
   // Formal check that the core idea (dual aggregates are the restriction of primal aggregates onto the interface) is upheld
   // We do this by checking that the partial primal aggregates which are mapped back from the dual aggregates are a subset of the actual primal aggregates
   
+  // Note: even though GetVertex2AggId() includes ghost nodes, the locally owned node IDs come first
   ArrayRCP<const LO> primalVertex2AggId = primalAggs->GetVertex2AggId()->getData(0);
   ArrayRCP<const LO> dualVertex2AggId = dualAggs->GetVertex2AggId()->getData(0);
   
-  bool aggStructureCheck = true;
   
+  /*
   LO_view aggPtrPrimal;
   LO_view aggNodesPrimal;
   LO_view unaggregatedPrimal;
   primalAggs->ComputeNodesInAggregate(aggPtrPrimal, aggNodesPrimal, unaggregatedPrimal);
-  
+  */
   LO_view aggPtrDual;
   LO_view aggNodesDual;
   LO_view unaggregatedDual;
   dualAggs->ComputeNodesInAggregate(aggPtrDual, aggNodesDual, unaggregatedDual);
   
-  if(unaggregatedPrimal.size() != 0 || unaggregatedDual.size() != 0)
-    aggStructureCheck = false;
+  ///if(unaggregatedPrimal.size() != 0 || unaggregatedDual.size() != 0)
+    ///aggStructureCheck = false;
+    /*
+  if(unaggregatedPrimal.size() != 0) fileMainPerRank<<"------FAILS line306, "<<unaggregatedPrimal.size()<<std::endl;
+  if(unaggregatedDual.size() != 0) fileMainPerRank<<"------FAILS line307, "<<unaggregatedDual.size()<<std::endl;
   
+  
+  auto unaggregatedHost = Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), unaggregatedPrimal);
+  for (size_t i = 0; i < unaggregatedHost.extent(0); ++i) {
+    std::cout << "Rank " << rank << ": unaggregated node local index = " << unaggregatedHost(i) << std::endl;
+  }*/
+
+  
+  // Check for unaggregated nodes
+  bool allAggregateCheckPrimal = true;
+  for (LO i = 0; i < mynnodePrimal; ++i) {
+    if (primalVertex2AggId[i] == Teuchos::OrdinalTraits<LO>::invalid()) {
+      allAggregateCheckPrimal = false;
+      fileMainPerRank << "------FAILS: Unaggregated owned primal node at local index " << i << "; primalVertex2AggId.size()="<<primalVertex2AggId.size()<<std::endl;
+      break;
+    }
+  }
+  TEST_EQUALITY(allAggregateCheckPrimal, true);
+  
+  bool allAggregateCheckDual = true;
+  for (LO i = 0; i < mynnodeDual; ++i) {
+    if (dualVertex2AggId[i] == Teuchos::OrdinalTraits<LO>::invalid()) {
+      allAggregateCheckDual = false;
+      fileMainPerRank << "------FAILS: Unaggregated owned dual node at local index " << i << std::endl<<std::endl;
+      break;
+    }
+  }
+  TEST_EQUALITY(allAggregateCheckDual, true);
+
+  fileMainPerRank<<"------------------------line338"<<std::endl;
     //# maybe add another check with mynnodePrimal and mynnodeDual in here somewhere
+  bool aggStructureCheck = true;
   const LO numDualAggs = dualAggs->GetNumAggregates();
   for(LO dualAggId = 0; dualAggId < numDualAggs && aggStructureCheck; ++dualAggId) {
     LO primalAggId_mapped = -2; // should not change from first iteration onwards
-    for (LO dualNodeId = aggPtrDual[dualAggId]; dualNodeId < aggPtrDual[dualAggId+1]; ++dualNodeId)
-    {
+    fileMainPerRank<<"\tdualAggId = "<<dualAggId<<std::endl;
+    for (LO ptrPos = aggPtrDual[dualAggId]; ptrPos < aggPtrDual[dualAggId+1]; ++ptrPos) {
+      LO dualNodeId = aggNodesDual[ptrPos];
+      fileMainPerRank<<"\t\tdualNodeId = "<<dualNodeId<<std::endl;
       // sanity
       if(myDual2Primal->find(dualNodeId) == myDual2Primal->end()) { //!contains
         aggStructureCheck = false;
+        fileMainPerRank<<"------FAILS line315"<<std::endl;
         break;
       }
       LO primalNodeId_mapped = myDual2Primal->at(dualNodeId);
+      fileMainPerRank<<"\t\tprimalNodeId_mapped = "<<primalNodeId_mapped<<std::endl;
       
-      if(primalNodeId_mapped >= primalVertex2AggId.size()) {
+      if(primalNodeId_mapped >= mynnodePrimal) {
         aggStructureCheck = false;
+        fileMainPerRank<<"------FAILS line322"<<std::endl;
         break;
       }
       LO primalAggId_mappedTmp = primalVertex2AggId[primalNodeId_mapped];
+      fileMainPerRank<<"\t\tprimalAggId_mappedTmp = "<<primalAggId_mappedTmp<<std::endl;
       
       // check that all of the corresponding primal nodes are also in the same aggregate
       if(primalAggId_mapped == -2)
         primalAggId_mapped = primalAggId_mappedTmp;
       else if(primalAggId_mappedTmp != primalAggId_mapped) {
         aggStructureCheck = false;
+        fileMainPerRank<<"------FAILS line332"<<std::endl;
         break;
       }
     }
   }
   
+  //fileMainPerRank<<"------line167"<<std::endl;
+  //for(GO i =0;i<myDual2Primal->size();++i)
+  //  fileMainPerRank<<"\t"<<i<<","<<myDual2Primal->at(i)<<std::endl;
+    
+  fileMainPerRank.close();
+  
+  
+  RCP<Teuchos::FancyOStream> outfs = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
+  A00->getRowMap()->describe(*outfs, Teuchos::VERB_EXTREME);
+  A11->getRowMap()->describe(*outfs, Teuchos::VERB_EXTREME);
+  
+  
   // i think sizes already ensured by above
   
   // Also check all sizes
   //for all procs, for all aggs: primalaggsmapped.size() == dualaggs.size() == myDual2Primal.size()
-  bool aggAndMapSizesCheck = true;
+  MueLu::Utils2::writeInterleavedPerRank<LO, GO, NO>(comm, {"primalAggs", "dualAggs"}, {primalAggs, dualAggs}, "___UT_Aggs_");
   //...
   
-  TEST_EQUALITY(true, true);
+  TEST_EQUALITY(aggStructureCheck, true);
 }
 
 #define MUELU_ETI_GROUP(SC, LO, GO, Node)                                                      \

@@ -83,7 +83,7 @@ void writeInterleavedPerRank(
     const std::vector<std::string>& descriptions,
     const std::vector<Teuchos::RCP<const MueLu::Aggregates<LocalOrdinal, GlobalOrdinal, Node>>>& aggss, const std::string& prefix = "") {
   int rank = comm->getRank();
-  std::ofstream outFile(prefix+"_unitTest_rank"+std::to_string(rank)+".txt");
+  std::ofstream outFile("outFilesPerRank/"+prefix+"_rank"+std::to_string(rank)+".txt");
   
   RCP<Teuchos::FancyOStream> outfs = Teuchos::fancyOStream(rcpFromRef(outFile));
 
