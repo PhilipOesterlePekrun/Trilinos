@@ -113,7 +113,7 @@ class UnscaledComparison {
   @class ScaledComparison
   @brief Orders entries of row \f$i\f$ by \f$\frac{|A_{ij}|^2}{|A_{ii}| |A_{jj}|}\f$.
 */
-template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
+template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node, Misc::StrengthMeasure measure>
 class ScaledComparison {
  public:
   using matrix_type        = Xpetra::Matrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>;
@@ -139,9 +139,15 @@ class ScaledComparison {
   ScaledComparison(matrix_type& A_, results_view& results_)
     : A(A_.getLocalMatrixDevice())
     , results(results_) {
-    diagVec        = Utilities<Scalar, LocalOrdinal, GlobalOrdinal, Node>::GetMatrixOverlappedDiagonal(A_);
-    auto lclDiag2d = diagVec->getLocalViewDevice(Xpetra::Access::ReadOnly);
-    diag           = Kokkos::subview(lclDiag2d, Kokkos::ALL(), 0);
+    if constexpr ((measure == Misc::SmoothedAggregationMeasure) || (measure == Misc::SignedSmoothedAggregationMeasure)) {
+      diagVec        = Utilities<Scalar, LocalOrdinal, GlobalOrdinal, Node>::GetMatrixOverlappedDiagonal(A_);
+      auto lclDiag2d = diagVec->getLocalViewDevice(Xpetra::Access::ReadOnly);
+      diag           = Kokkos::subview(lclDiag2d, Kokkos::ALL(), 0);
+    } else if constexpr (measure == Misc::SignedRugeStuebenMeasure) {
+      diagVec    = Utilities<Scalar, LocalOrdinal, GlobalOrdinal, Node>::GetMatrixMaxMinusOffDiagonal(A_);
+      auto lcl2d = diagVec->getLocalViewDevice(Xpetra::Access::ReadOnly);
+      diag       = Kokkos::subview(lcl2d, Kokkos::ALL(), 0);
+    }
   }
 
   template <class local_matrix_type2, class diag_view_type2>
@@ -154,6 +160,7 @@ class ScaledComparison {
 
     using ATS           = Kokkos::ArithTraits<scalar_type>;
     using magnitudeType = typename ATS::magnitudeType;
+    using mATS          = Kokkos::ArithTraits<magnitudeType>;
 
     const local_matrix_type2 A;
     const diag_view_type2 diag;
@@ -172,9 +179,24 @@ class ScaledComparison {
 
     KOKKOS_INLINE_FUNCTION
     magnitudeType get_value(size_t x) const {
-      auto x_aij    = ATS::magnitude(A.values(offset + x) * A.values(offset + x));
-      auto x_aiiajj = ATS::magnitude(diag(rlid) * diag(A.graph.entries(offset + x)));
-      return (x_aij / x_aiiajj);
+      if constexpr (measure == Misc::SmoothedAggregationMeasure) {
+        auto x_aij    = ATS::magnitude(A.values(offset + x) * A.values(offset + x));
+        auto x_aiiajj = ATS::magnitude(diag(rlid) * diag(A.graph.entries(offset + x)));
+        return (x_aij / x_aiiajj);
+      } else if constexpr (measure == Misc::SignedRugeStuebenMeasure) {
+        auto val         = A.values(offset + x);
+        auto neg_aij     = -ATS::real(val);
+        auto max_neg_aik = ATS::real(diag(rlid));
+        return neg_aij / max_neg_aik;
+      } else if constexpr (measure == Misc::SignedSmoothedAggregationMeasure) {
+        auto val                  = A.values(offset + x);
+        auto x_aiiajj             = ATS::magnitude(diag(rlid) * diag(A.graph.entries(offset + x)));
+        const bool is_nonpositive = ATS::real(val) <= mATS::zero();
+        magnitudeType aij2        = ATS::magnitude(val) * ATS::magnitude(val);
+        if (is_nonpositive)
+          aij2 = -aij2;
+        return (aij2 / x_aiiajj);
+      }
     }
 
     KOKKOS_INLINE_FUNCTION
@@ -316,7 +338,7 @@ class UnscaledDistanceLaplacianComparison {
   @class ScaledDistanceLaplacianComparison
   @brief Orders entries of row \f$i\f$ by \f$\frac{|d_{ij}|^2}{|d_{ii}| |d_{jj}|}\f$ where \f$d_ij\f$ is the distance Laplacian.
 */
-template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node, class DistanceFunctorType>
+template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node, class DistanceFunctorType, Misc::StrengthMeasure measure>
 class ScaledDistanceLaplacianComparison {
  public:
   using matrix_type        = Xpetra::Matrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>;
@@ -345,9 +367,15 @@ class ScaledDistanceLaplacianComparison {
     , results(results_)
     , dist2(dist2_) {
     // Construct ghosted distance Laplacian diagonal
-    diagVec        = DistanceLaplacian::getDiagonal(A_, dist2);
-    auto lclDiag2d = diagVec->getLocalViewDevice(Xpetra::Access::ReadOnly);
-    diag           = Kokkos::subview(lclDiag2d, Kokkos::ALL(), 0);
+    if constexpr ((measure == Misc::SmoothedAggregationMeasure) || (measure == Misc::SignedSmoothedAggregationMeasure)) {
+      diagVec        = DistanceLaplacian::getDiagonal(A_, dist2);
+      auto lclDiag2d = diagVec->getLocalViewDevice(Xpetra::Access::ReadOnly);
+      diag           = Kokkos::subview(lclDiag2d, Kokkos::ALL(), 0);
+    } else if constexpr (measure == Misc::SignedRugeStuebenMeasure) {
+      diagVec        = DistanceLaplacian::getMaxMinusOffDiagonal(A_, dist2);
+      auto lclDiag2d = diagVec->getLocalViewDevice(Xpetra::Access::ReadOnly);
+      diag           = Kokkos::subview(lclDiag2d, Kokkos::ALL(), 0);
+    }
   }
 
   template <class local_matrix_type2, class DistanceFunctorType2, class diag_view_type2>
@@ -360,6 +388,7 @@ class ScaledDistanceLaplacianComparison {
 
     using ATS           = Kokkos::ArithTraits<scalar_type>;
     using magnitudeType = typename ATS::magnitudeType;
+    using mATS          = Kokkos::ArithTraits<magnitudeType>;
 
     const local_matrix_type2 A;
     const diag_view_type2 diag;
@@ -368,7 +397,9 @@ class ScaledDistanceLaplacianComparison {
     const local_ordinal_type offset;
     const results_view results;
 
-    const scalar_type one = ATS::one();
+    const scalar_type one     = ATS::one();
+    const scalar_type zero    = ATS::zero();
+    const magnitudeType mzero = mATS::zero();
 
    public:
     KOKKOS_INLINE_FUNCTION
@@ -389,9 +420,27 @@ class ScaledDistanceLaplacianComparison {
       } else {
         val = diag(rlid);
       }
-      auto aiiajj = ATS::magnitude(diag(rlid)) * ATS::magnitude(diag(clid));  // |a_ii|*|a_jj|
-      auto aij2   = ATS::magnitude(val) * ATS::magnitude(val);                // |a_ij|^2
-      return (aij2 / aiiajj);
+
+      if constexpr (measure == Misc::SmoothedAggregationMeasure) {
+        auto aiiajj = ATS::magnitude(diag(rlid)) * ATS::magnitude(diag(clid));  // |a_ii|*|a_jj|
+        auto aij2   = ATS::magnitude(val) * ATS::magnitude(val);                // |a_ij|^2
+        return (aij2 / aiiajj);
+      } else if constexpr (measure == Misc::SignedRugeStuebenMeasure) {
+        auto neg_aij     = -ATS::real(val);
+        auto max_neg_aik = ATS::real(diag(rlid));
+        if (ATS::real(neg_aij) >= mzero)
+          return ATS::magnitude(neg_aij / max_neg_aik);
+        else
+          return -ATS::magnitude(neg_aij / max_neg_aik);
+      } else if constexpr (measure == Misc::SignedSmoothedAggregationMeasure) {
+        auto aiiajj               = ATS::magnitude(diag(rlid)) * ATS::magnitude(diag(clid));  // |a_ii|*|a_jj|
+        const bool is_nonpositive = ATS::real(val) <= mATS::zero();
+        magnitudeType aij2        = ATS::magnitude(val) * ATS::magnitude(val);  // |a_ij|^2
+        // + |a_ij|^2, if a_ij < 0, - |a_ij|^2 if a_ij >=0
+        if (is_nonpositive)
+          aij2 = -aij2;
+        return aij2 / aiiajj;
+      }
     }
 
     KOKKOS_INLINE_FUNCTION
