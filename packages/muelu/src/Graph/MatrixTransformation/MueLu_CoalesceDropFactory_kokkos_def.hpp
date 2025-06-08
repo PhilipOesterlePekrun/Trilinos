@@ -1570,7 +1570,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
 
         auto signed_classical_rs_dropping = ClassicalDropping::make_drop_functor<SoC>(*A, threshold, results);
 
-        if (aggregationMayCreateDirichlet) {
+        /*if (aggregationMayCreateDirichlet) {
           MueLu_runDroppingFunctors(signed_classical_rs_dropping,
                                     // drop_boundaries,
                                     preserve_diagonals,
@@ -1580,6 +1580,45 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
           MueLu_runDroppingFunctors(signed_classical_rs_dropping,
                                     // drop_boundaries,
                                     preserve_diagonals);
+        }*/
+
+        if (algo == "block diagonal signed classical" || algo == "block diagonal colored signed classical") {
+          auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
+          auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
+
+          if (classicalAlgoStr == "default") {
+            if (aggregationMayCreateDirichlet) {
+              MueLu_runDroppingFunctors(block_diagonalize,
+                                        signed_classical_rs_dropping,
+                                        drop_boundaries,
+                                        preserve_diagonals,
+                                        mark_singletons_as_boundary);
+
+            } else {
+              MueLu_runDroppingFunctors(block_diagonalize,
+                                        signed_classical_rs_dropping,
+                                        drop_boundaries,
+                                        preserve_diagonals);
+            }
+          } else {
+            TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::RuntimeError, "\"aggregation: classical algo\" must be default, not \"" << classicalAlgoStr << "\"");
+          }
+        } else {
+          if (classicalAlgoStr == "default") {
+            if (aggregationMayCreateDirichlet) {
+              MueLu_runDroppingFunctors(signed_classical_rs_dropping,
+                                        drop_boundaries,
+                                        preserve_diagonals,
+                                        mark_singletons_as_boundary);
+
+            } else {
+              MueLu_runDroppingFunctors(signed_classical_rs_dropping,
+                                        drop_boundaries,
+                                        preserve_diagonals);
+            }
+          } else {
+            TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::RuntimeError, "\"aggregation: classical algo\" must be default, not \"" << classicalAlgoStr << "\"");
+          }
         }
       } else if (algo == "signed classical sa") {
         const auto SoC = Misc::SignedSmoothedAggregationMeasure;
@@ -1734,6 +1773,11 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
         } else {
           TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::RuntimeError, "\"aggregation: distance laplacian algo\" must be one of (default|unscaled cut|scaled cut|scaled cut symmetric), not \"" << distanceLaplacianAlgoStr << "\"");
         }
+      } else if (algo == "block diagonal") {
+        auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
+        auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
+
+        MueLu_runDroppingFunctors(block_diagonalize);
       } else {
         TEUCHOS_ASSERT(false);
       }
