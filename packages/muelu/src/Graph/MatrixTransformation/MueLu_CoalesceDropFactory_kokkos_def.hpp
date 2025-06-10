@@ -1220,7 +1220,13 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
           }
         }
       } else if (algo == "block diagonal") {
-        auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
+        std::cout << "line1223\n";
+        auto BlockNumbers = GetBlockNumberMVs(currentLevel);
+
+        std::cout << "line1226 BlockNumbersScalar//##\n";
+        std::get<0>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+        std::get<1>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
         auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
 
         MueLu_runDroppingFunctors(block_diagonalize);
@@ -1318,6 +1324,8 @@ template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrdinal, Node>::boundary_nodes_type> CoalesceDropFactory_kokkos<Scalar, LocalOrdinal, GlobalOrdinal, Node>::
     BuildVector(Level& currentLevel) const {
   FactoryMonitor m(*this, "Build", currentLevel);
+
+  std::cout << "line1322//##\n";
 
   using MatrixType        = Xpetra::CrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>;
   using GraphType         = Xpetra::CrsGraph<LocalOrdinal, GlobalOrdinal, Node>;
@@ -1541,6 +1549,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
       auto mark_singletons_as_boundary = Misc::MarkSingletonVectorFunctor(lclA, rowTranslation, boundaryNodes, results);
 
       if (algo == "classical") {
+        std::cout << "line1547\n";
         const auto SoC = Misc::SmoothedAggregationMeasure;
 
         if (classicalAlgoStr == "default") {
@@ -1585,19 +1594,20 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
         if (algo == "block diagonal signed classical" || algo == "block diagonal colored signed classical") {
           auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
           auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
+          /////##DistanceLaplacian::make_vector_drop_functor<SoC>(*A, *mergedA, threshold, dist2, results, rowTranslation, colTranslation);
 
           if (classicalAlgoStr == "default") {
             if (aggregationMayCreateDirichlet) {
               MueLu_runDroppingFunctors(block_diagonalize,
                                         signed_classical_rs_dropping,
-                                        drop_boundaries,
+                                        // drop_boundaries,
                                         preserve_diagonals,
                                         mark_singletons_as_boundary);
 
             } else {
               MueLu_runDroppingFunctors(block_diagonalize,
                                         signed_classical_rs_dropping,
-                                        drop_boundaries,
+                                        // drop_boundaries,
                                         preserve_diagonals);
             }
           } else {
@@ -1607,13 +1617,13 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
           if (classicalAlgoStr == "default") {
             if (aggregationMayCreateDirichlet) {
               MueLu_runDroppingFunctors(signed_classical_rs_dropping,
-                                        drop_boundaries,
+                                        // drop_boundaries,
                                         preserve_diagonals,
                                         mark_singletons_as_boundary);
 
             } else {
               MueLu_runDroppingFunctors(signed_classical_rs_dropping,
-                                        drop_boundaries,
+                                        // drop_boundaries,
                                         preserve_diagonals);
             }
           } else {
@@ -1774,7 +1784,16 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
           TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::RuntimeError, "\"aggregation: distance laplacian algo\" must be one of (default|unscaled cut|scaled cut|scaled cut symmetric), not \"" << distanceLaplacianAlgoStr << "\"");
         }
       } else if (algo == "block diagonal") {
-        auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
+        auto BlockNumbers = GetBlockNumberMVs(currentLevel);
+
+        std::cout << "line1784 BlockNumbers//##\n";
+        std::get<0>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+        std::get<1>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+        std::cout << "---------------------------------------------------------------------------------\n\t"
+                  << "line1790 IN FACTORY: A->getCrsGraph()->describe()\n";
+        A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
         auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
 
         MueLu_runDroppingFunctors(block_diagonalize);
@@ -1791,8 +1810,11 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
   }
   LocalOrdinal nnz_filtered = nnz.first;
   LocalOrdinal nnz_graph    = nnz.second;
-  GO numTotal               = lclA.nnz();
-  GO numDropped             = numTotal - nnz_filtered;
+
+  std::cout << "line1815, nnz.first=" << nnz.first << ", nnz.second=" << nnz.second << std::endl;
+
+  GO numTotal   = lclA.nnz();
+  GO numDropped = numTotal - nnz_filtered;
   // We now know the number of entries of filtered A and have the final rowptr.
 
   //////////////////////////////////////////////////////////////////////
@@ -1843,6 +1865,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
 
     filteredA = Xpetra::MatrixFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(lclFilteredA, A->getRowMap(), A->getColMap(), A->getDomainMap(), A->getRangeMap());
     filteredA->SetFixedBlockSize(blkSize);
+    std::cout << "line1869 blkSize=" << blkSize << std::endl;
 
     if (reuseEigenvalue) {
       // Reuse max eigenvalue from A

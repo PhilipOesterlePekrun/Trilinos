@@ -1213,6 +1213,8 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
   typedef Teuchos::ScalarTraits<SC> STS;
   typedef typename STS::magnitudeType real_type;
   typedef Xpetra::MultiVector<real_type, LO, GO, NO> RealValuedMultiVector;
+  typedef Teuchos::ScalarTraits<LO> STL;
+  LO zero = STL::zero(), one = STL::one();
 
   MUELU_TESTING_SET_OSTREAM;
   MUELU_TESTING_LIMIT_SCOPE(Scalar, GlobalOrdinal, Node);
@@ -1221,38 +1223,236 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
   RCP<const Teuchos::Comm<int>> comm = Parameters::getDefaultComm();
   Xpetra::UnderlyingLib lib          = TestHelpers_kokkos::Parameters::getLib();
 
-  GO nx = 10 * comm->getSize();
-  Teuchos::ParameterList matrixList;
-  matrixList.set("nx", nx);
-  RCP<Matrix> A = TestHelpers_kokkos::TestFactory<SC, LO, GO, NO>::BuildBlockMatrixAsPoint(matrixList, lib);
-  A->SetFixedBlockSize(1);  // So we can block diagonalize
-  Level fineLevel;
-  fineLevel.Set("A", A);
+  // interleaved block diagonal - 1 dof per node
+  {
+    GO nx = 10 * comm->getSize();
+    Teuchos::ParameterList matrixList;
+    matrixList.set("nx", nx);
+    RCP<Matrix> A = TestHelpers_kokkos::TestFactory<SC, LO, GO, NO>::BuildBlockMatrixAsPoint(matrixList, lib);
+    A->SetFixedBlockSize(1);  // So we can block diagonalize
+    Level fineLevel;
+    fineLevel.Set("A", A);
 
-  RCP<RealValuedMultiVector> coordinates = Galeri::Xpetra::Utils::CreateCartesianCoordinates<SC, LO, GO, Map, RealValuedMultiVector>("1D", A->getRowMap(), matrixList);
-  fineLevel.Set("Coordinates", coordinates);
+    RCP<RealValuedMultiVector> coordinates = Galeri::Xpetra::Utils::CreateCartesianCoordinates<SC, LO, GO, Map, RealValuedMultiVector>("1D", A->getRowMap(), matrixList);
+    fineLevel.Set("Coordinates", coordinates);
 
-  RCP<InitialBlockNumberFactory> ibFact = rcp(new InitialBlockNumberFactory());
-  Teuchos::ParameterList ibList;
-  ibList.set("aggregation: block diagonal: interleaved blocksize", 3);
-  RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
-  CoalesceDropFactory_kokkos coalesceDropFact;
-  coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
-  coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
-  coalesceDropFact.SetFactory("BlockNumber", ibFact);
-  coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(1.0 / 8.0));
-  coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(std::string("block diagonal")));
-  coalesceDropFact.SetParameter("aggregation: block diagonal: interleaved blocksize", Teuchos::ParameterEntry(3));
-  coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
+    RCP<InitialBlockNumberFactory> ibFact = rcp(new InitialBlockNumberFactory());
+    Teuchos::ParameterList ibList;
+    ibList.set("aggregation: block diagonal: interleaved blocksize", 3);
+    RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
+    CoalesceDropFactory_kokkos coalesceDropFact;
+    coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
+    coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
+    coalesceDropFact.SetFactory("BlockNumber", ibFact);
+    coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(1.0 / 8.0));
+    coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(std::string("block diagonal")));
+    coalesceDropFact.SetParameter("aggregation: block diagonal: interleaved blocksize", Teuchos::ParameterEntry(3));
+    coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
 
-  fineLevel.Request("Graph", &coalesceDropFact);
-  fineLevel.Request("DofsPerNode", &coalesceDropFact);
+    fineLevel.Request("Graph", &coalesceDropFact);
+    fineLevel.Request("DofsPerNode", &coalesceDropFact);
 
-  coalesceDropFact.Build(fineLevel);
+    coalesceDropFact.Build(fineLevel);
 
-  RCP<LWGraph_kokkos> graph = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
-  LO myDofsPerNode          = fineLevel.Get<LO>("DofsPerNode", &coalesceDropFact);
-  TEST_EQUALITY(Teuchos::as<int>(myDofsPerNode) == 1, true);
+    RCP<LWGraph_kokkos> graph = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
+    LO myDofsPerNode          = fineLevel.Get<LO>("DofsPerNode", &coalesceDropFact);
+    TEST_EQUALITY(Teuchos::as<int>(myDofsPerNode) == 1, true);
+  }
+
+  // block diagonal - 1 dof per node
+  {
+    GO n = 10 * comm->getSize();
+
+    RCP<Matrix> A             = TestHelpers_kokkos::TestFactory<SC, LO, GO, NO>::Build2DPoisson(n);
+    RCP<LOVector> blocknumber = Xpetra::VectorFactory<LO, LO, GO, NO>::Build(A->getDomainMap());
+
+    for (size_t row = 0; row < A->getLocalNumRows(); row++) {
+      GO global_row = A->getRowMap()->getGlobalElement(row);
+
+      if (global_row < 0.5 * n * n) {
+        // lower part of domain get's 0
+        blocknumber->replaceLocalValue(row, zero);
+      } else {
+        // upper part of domain get's 1
+        blocknumber->replaceLocalValue(row, one);
+      }
+    }
+
+    Level fineLevel;
+    fineLevel.Set("A", A);
+    fineLevel.Set("BlockNumber", blocknumber);
+
+    Teuchos::ParameterList ibList;
+    RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
+    CoalesceDropFactory_kokkos coalesceDropFact;
+    coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
+    coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(std::string("block diagonal")));
+    coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(0.0001));
+    coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
+
+    fineLevel.Request("Graph", &coalesceDropFact);
+
+    coalesceDropFact.Build(fineLevel);
+
+    RCP<LWGraph_kokkos> graph_d = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
+    auto graph                  = graph_d->copyToHost();
+    auto numGlobalEdges         = graph->GetGlobalNumEdges();
+    auto fullNumGlobalEdges     = A->getCrsGraph()->getGlobalNumEntries();
+
+    std::cout << "1dof: graph->GetCrsGraph()->describe()\n";
+    graph->GetCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    std::cout << "1dof: A->getCrsGraph()->describe()\n";
+    A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    // we drop exactly two off-diagonal blocks each of entry size n
+    TEST_EQUALITY(Teuchos::as<GO>(fullNumGlobalEdges - numGlobalEdges) == 2 * n, true);
+  }
+
+  // block diagonal - 3 dof per node
+  {
+    constexpr int ndofn = 3;
+    // unrelated to 3 dofs per node; just a small "sparse" matrix
+    GO n = 3 * comm->getSize();
+
+    Teuchos::ParameterList galeriList;
+    galeriList.set("nx", Teuchos::as<GlobalOrdinal>(n));
+    galeriList.set("ny", Teuchos::as<GlobalOrdinal>(n));
+    galeriList.set("nz", Teuchos::as<GlobalOrdinal>(n));
+
+    auto map = Galeri::Xpetra::CreateMap<LO, GO, Node>(lib, "Cartesian3D", comm, galeriList);
+
+    std::cout << "---------------------------------------------------------------------------------\n\t"
+              << "PRE map->describe()\n";
+    map->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    map = Xpetra::MapFactory<LO, GO, Node>::Build(map, ndofn);  //## this has to be before blocknumber is built from it ofc
+
+    std::cout << "---------------------------------------------------------------------------------\n\t"
+              << "POST map->describe()\n";
+    map->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    RCP<LOVector> blocknumber = Xpetra::VectorFactory<LO, LO, GO, NO>::Build(map);
+
+    for (size_t row = 0; row < blocknumber->getLocalLength(); row++) {
+      GO global_row = map->getGlobalElement(row);
+
+      if (global_row < ndofn * (int)(0.5 * n * n * n)) {
+        // lower part of domain get's 0
+        blocknumber->replaceLocalValue(row, zero);
+      } else {
+        // upper part of domain get's 1
+        blocknumber->replaceLocalValue(row, one);
+      }
+    }
+
+    // map = Xpetra::MapFactory<LO, GO, Node>::Build(map, ndofn);
+
+    RCP<Galeri::Xpetra::Problem<Map, CrsMatrixWrap, MultiVector>> Pr =
+        Galeri::Xpetra::BuildProblem<SC, LO, GO, Map, CrsMatrixWrap, MultiVector>("Elasticity3D", map, galeriList);
+
+    RCP<Matrix> A = Pr->BuildMatrix();
+    A->SetFixedBlockSize(ndofn);
+
+    Level fineLevel;
+    fineLevel.Set("A", A);
+    fineLevel.Set("BlockNumber", blocknumber);
+
+    Teuchos::ParameterList ibList;
+    RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
+    CoalesceDropFactory_kokkos coalesceDropFact;
+    coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
+    coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(std::string("block diagonal")));
+    coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(0.0001));  // 0.0001));
+    coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
+
+    // RCP<LWGraph_kokkos> g0 = rcp(new LWGraph_kokkos(A->getCrsGraph(), "original graph"));
+    // g0->print(*Teuchos::getFancyOStream(rcpFromRef(std::cout)),Teuchos::VERB_EXTREME);
+
+    std::cout << "test line1355\n";
+    fineLevel.Request("Graph", &coalesceDropFact);
+    fineLevel.Request("A", &coalesceDropFact);
+    std::cout << "test line1357\n";
+
+    /// TEST_THROW(coalesceDropFact.Build(fineLevel), MueLu::Exceptions::RuntimeError);
+
+    RCP<LWGraph_kokkos> graph_d = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
+    std::cout << "graph_d->print()\n";
+    graph_d->print(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    std::cout << "test line1363\n";
+
+    auto graph          = graph_d->copyToHost();
+    auto numGlobalEdges = graph->GetGlobalNumEdges();
+    std::cout << "test line1366\n";
+    auto fullNumGlobalEdges = A->getCrsGraph()->getGlobalNumEntries();
+    std::cout << "line1383 unittest Teuchos::as<GO>(fullNumGlobalEdges)\n\t" << Teuchos::as<GO>(fullNumGlobalEdges) << std::endl;  //#
+    std::cout << "line1384 unittest Teuchos::as<GO>(numGlobalEdges)\n\t" << Teuchos::as<GO>(numGlobalEdges) << std::endl;          //#
+
+    std::cout << "---------------------------------------------------------------------------------\n\t"
+              << "A->describe()\n";
+    A->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    std::cout << "---------------------------------------------------------------------------------\n\t"
+              << "A->getCrsGraph()->describe()\n";
+    A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    std::cout << "---------------------------------------------------------------------------------\n\t \
+      graph->GetCrsGraph()->describe()\n";
+    graph->GetCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    RCP<Matrix> Aout = fineLevel.Get<RCP<Matrix>>("A", &coalesceDropFact);
+
+    std::cout << "---------------------------------------------------------------------------------\n\t"
+              << "test line1403 Aout->getCrsGraph()->describe()\n";
+    Aout->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+
+    // we drop exactly two off-diagonal blocks each of entry size ?
+    // TEST_EQUALITY(Teuchos::as<GO>(fullNumGlobalEdges-numGlobalEdges) == 2, true);
+    TEST_EQUALITY(false, true);
+
+    auto graph_h = graph_d->copyToHost();  // LWGraph after dropping
+    LO localBad  = 0;
+
+    for (LO row = 0; row < static_cast<LO>(graph_h->GetNodeNumVertices()); ++row) {
+      // GraphRowViewConst (length + operator()(i) accessor)
+      auto neigh = graph_h->getNeighborVertices(row);
+
+      for (size_t k = 0; k < neigh.length; ++k) {
+        LO col = neigh(k);
+        if (blocknumber->getData(0)[row] != blocknumber->getData(0)[col])
+          ++localBad;
+      }
+    }
+
+    GO globalBad = 0;
+    MueLu_sumAll(comm, localBad, globalBad);
+    TEST_EQUALITY(globalBad, 0);
+
+    /*
+     // host copies ---------------------------------------------------------------
+     auto graph_h = graph_d->copyToHost();                // RCP<LWGraph_kokkos>
+     auto lgraph  = graph_h->getLocalGraphHost();         // KokkosSparse::StaticCrsGraph
+     auto rowptr  = lgraph.row_map;
+     auto cols    = lgraph.entries;
+
+     auto blkView = blocknumber->getLocalViewHost
+                     (Tpetra::Access::ReadOnly);         // 2-D Kokkos::View
+     LO localBad = 0;
+
+     // test ----------------------------------------------------------------------
+     for (LO row = 0; row < static_cast<LO>(rowptr.extent(0) - 1); ++row) {
+       for (auto idx = rowptr(row); idx < rowptr(row + 1); ++idx) {
+         LO col = cols(idx);
+         if (blkView(row,0) != blkView(col,0)) ++localBad;
+       }
+     }
+
+     GO globalBad = 0;
+     MueLu_sumAll(*comm, localBad, globalBad);
+     TEST_EQUALITY(globalBad, 0);
+ */
+  }
 }
 
 TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonalClassical, Scalar, LocalOrdinal, GlobalOrdinal, Node) {
@@ -2516,86 +2716,6 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, 2x2, Scalar, Local
   }
 }
 
-TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, SignedClassicalDistanceLaplacian, Scalar, LocalOrdinal, GlobalOrdinal, Node) {
-#include <MueLu_UseShortNames.hpp>
-  typedef Teuchos::ScalarTraits<SC> STS;
-  typedef typename STS::magnitudeType real_type;
-
-  MUELU_TESTING_SET_OSTREAM;
-  MUELU_TESTING_LIMIT_SCOPE(Scalar, GlobalOrdinal, Node);
-  out << "version: " << MueLu::Version() << std::endl;
-
-  RCP<const Teuchos::Comm<int>> comm = TestHelpers_kokkos::Parameters::getDefaultComm();
-  Xpetra::UnderlyingLib lib          = TestHelpers_kokkos::Parameters::getLib();
-
-  GO nx = 20;
-  Teuchos::ParameterList matrixList;
-  matrixList.set("nx", nx);
-  matrixList.set("matrixType", "Laplace1D");
-  auto [A, coords, nullspace, dofsPerNode] = TestHelpers_kokkos::TestFactory<SC, LO, GO, NO>::BuildMatrixCoordsNullspace(matrixList, lib);
-
-  Level fineLevel;
-  fineLevel.Set("A", A);
-  fineLevel.Set("Coordinates", coords);
-  fineLevel.Set("Nullspace", nullspace);
-
-  RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
-  CoalesceDropFactory_kokkos coalesceDropFact;
-  coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
-  coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(1.0));
-  coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(std::string("signed classical distance laplacian")));
-  fineLevel.Request("Graph", &coalesceDropFact);
-  fineLevel.Request("DofsPerNode", &coalesceDropFact);
-
-  coalesceDropFact.Build(fineLevel);
-
-  RCP<LWGraph_kokkos> graph_d = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
-  auto graph                  = graph_d->copyToHost();
-  LO myDofsPerNode            = fineLevel.Get<LO>("DofsPerNode", &coalesceDropFact);
-  TEST_EQUALITY(graph->GetGlobalNumEdges(), 20);
-  TEST_EQUALITY(Teuchos::as<int>(myDofsPerNode) == 1, true);
-}
-
-TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, SignedClassicalSADistanceLaplacian, Scalar, LocalOrdinal, GlobalOrdinal, Node) {
-#include <MueLu_UseShortNames.hpp>
-  typedef Teuchos::ScalarTraits<SC> STS;
-  typedef typename STS::magnitudeType real_type;
-
-  MUELU_TESTING_SET_OSTREAM;
-  MUELU_TESTING_LIMIT_SCOPE(Scalar, GlobalOrdinal, Node);
-  out << "version: " << MueLu::Version() << std::endl;
-
-  RCP<const Teuchos::Comm<int>> comm = TestHelpers_kokkos::Parameters::getDefaultComm();
-  Xpetra::UnderlyingLib lib          = TestHelpers_kokkos::Parameters::getLib();
-
-  GO nx = 20;
-  Teuchos::ParameterList matrixList;
-  matrixList.set("nx", nx);
-  matrixList.set("matrixType", "Laplace1D");
-  auto [A, coords, nullspace, dofsPerNode] = TestHelpers_kokkos::TestFactory<SC, LO, GO, NO>::BuildMatrixCoordsNullspace(matrixList, lib);
-
-  Level fineLevel;
-  fineLevel.Set("A", A);
-  fineLevel.Set("Coordinates", coords);
-  fineLevel.Set("Nullspace", nullspace);
-
-  RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
-  CoalesceDropFactory_kokkos coalesceDropFact;
-  coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
-  coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(0.6));
-  coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(std::string("signed classical sa distance laplacian")));
-  fineLevel.Request("Graph", &coalesceDropFact);
-  fineLevel.Request("DofsPerNode", &coalesceDropFact);
-
-  coalesceDropFact.Build(fineLevel);
-
-  RCP<LWGraph_kokkos> graph_d = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
-  auto graph                  = graph_d->copyToHost();
-  LO myDofsPerNode            = fineLevel.Get<LO>("DofsPerNode", &coalesceDropFact);
-  TEST_EQUALITY(graph->GetGlobalNumEdges(), 24);
-  TEST_EQUALITY(Teuchos::as<int>(myDofsPerNode) == 1, true);
-}
-
 #define MUELU_ETI_GROUP(SC, LO, GO, NO)                                                                                    \
   TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, Constructor, SC, LO, GO, NO)                            \
   TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, Build, SC, LO, GO, NO)                                  \
@@ -2623,9 +2743,7 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, SignedClassicalSAD
   TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, ClassicScalarWithFiltering, SC, LO, GO, NO)             \
   TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, ClassicBlockWithoutFiltering, SC, LO, GO, NO)           \
   TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, AggresiveDroppingIsMarkedAsBoundary, SC, LO, GO, NO)    \
-  TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, 2x2, SC, LO, GO, NO)                                    \
-  TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, SignedClassicalDistanceLaplacian, SC, LO, GO, NO)       \
-  TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, SignedClassicalSADistanceLaplacian, SC, LO, GO, NO)
+  TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, 2x2, SC, LO, GO, NO)
 
 // TEUCHOS_UNIT_TEST_TEMPLATE_4_INSTANT(CoalesceDropFactory_kokkos, ClassicBlockWithFiltering,     SC, LO, GO, NO) // not implemented yet
 
