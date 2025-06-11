@@ -1299,204 +1299,128 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
     auto numGlobalEdges         = graph->GetGlobalNumEdges();
     auto fullNumGlobalEdges     = A->getCrsGraph()->getGlobalNumEntries();
 
-    /// std::cout << "1dof: graph->GetCrsGraph()->describe()\n";
-    /// graph->GetCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-
-    /// std::cout << "1dof: A->getCrsGraph()->describe()\n";
-    /// A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-
     // we drop exactly two off-diagonal blocks each of entry size n
     TEST_EQUALITY(Teuchos::as<GO>(fullNumGlobalEdges - numGlobalEdges) == 2 * n, true);
   }
 
-  // block diagonal - 3 dof per node
+  // block diagonal - dof per node > 1
   {
-    constexpr int ndofn = 3;
+    auto runAndCheck = [&](const RCP<Matrix> &A, const RCP<LOVector> &blocknumber, LO ndofn, const std::string &algo) {
+      Level fineLevel;
+      fineLevel.Set("A", A);
+      fineLevel.Set("BlockNumber", blocknumber);
 
-    // unrelated to 3 dofs per node; just a small matrix that isn't nonzero everywhere
-    GO n = 3 * comm->getSize();
+      Teuchos::ParameterList ibList;
+      RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
+      CoalesceDropFactory_kokkos coalesceDropFact;
+      coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
+      coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(algo));
+      coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(0.0001));
+      coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
 
-    Teuchos::ParameterList galeriList;
-    galeriList.set("nx", Teuchos::as<GlobalOrdinal>(n));
-    galeriList.set("ny", Teuchos::as<GlobalOrdinal>(n));
-    galeriList.set("nz", Teuchos::as<GlobalOrdinal>(n));
+      fineLevel.Request("Graph", &coalesceDropFact);
+      fineLevel.Request("A", &coalesceDropFact);
+      fineLevel.Request("DofsPerNode", &coalesceDropFact);
 
-    auto map = Galeri::Xpetra::CreateMap<LO, GO, Node>(lib, "Cartesian3D", comm, galeriList);
+      LO myDofsPerNode = fineLevel.Get<LO>("DofsPerNode", &coalesceDropFact);
+      TEST_EQUALITY(Teuchos::as<int>(myDofsPerNode) == ndofn, true);
 
-    /// std::cout << "---------------------------------------------------------------------------------\n\t"
-    ///<< "PRE map->describe()\n";
-    /// map->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
+      RCP<LWGraph_kokkos> graph_d = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
 
-    map = Xpetra::MapFactory<LO, GO, Node>::Build(map, ndofn);  //## this has to be before blocknumber is built from it ofc
+      auto graph_h            = graph_d->copyToHost();
+      auto crsGraph           = graph_h->GetCrsGraph();
+      auto numGlobalEdges     = graph_h->GetGlobalNumEdges();
+      auto fullNumGlobalEdges = A->getCrsGraph()->getGlobalNumEntries();
 
-    /// std::cout << "---------------------------------------------------------------------------------\n\t"
-    ///<< "POST map->describe()\n";
-    /// map->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
+      // test if there are any edges between dofs which do not belong to the same block
+      bool testEmptyBlockDiagonals = true;
+      for (LO i = 0; i < crsGraph->getLocalNumRows(); ++i) {
+        Teuchos::ArrayView<const LO> rowEntries;
+        crsGraph->getLocalRowView(i, rowEntries);
+        std::unordered_set<LO> rowSet(rowEntries.begin(), rowEntries.end());
 
-    RCP<LOVector> blocknumber = Xpetra::VectorFactory<LO, LO, GO, NO>::Build(map);
-
-    for (size_t row = 0; row < blocknumber->getLocalLength(); row++) {
-      GO global_row = map->getGlobalElement(row);
-
-      if (global_row < ndofn * (int)(0.5 * n * n * n)) {
-        // lower part of domain get's 0
-        blocknumber->replaceLocalValue(row, zero);
-      } else {
-        // upper part of domain get's 1
-        blocknumber->replaceLocalValue(row, one);
+        // due to symmetry, we can check only e.g. the lower left triangular
+        for (LO j = 0; j < i; ++j)
+          if (blocknumber->getData(0)[ndofn * i] != blocknumber->getData(0)[ndofn * j])
+            if (rowSet.find(j) != rowSet.end())
+              testEmptyBlockDiagonals = false;
       }
-    }
 
-    // map = Xpetra::MapFactory<LO, GO, Node>::Build(map, ndofn);
+      TEST_EQUALITY(testEmptyBlockDiagonals, true);
+    };
 
-    RCP<Galeri::Xpetra::Problem<Map, CrsMatrixWrap, MultiVector>> Pr =
-        Galeri::Xpetra::BuildProblem<SC, LO, GO, Map, CrsMatrixWrap, MultiVector>("Elasticity3D", map, galeriList);
+    // Elasticity3D, contiguous blocknumber, algo = block diagonal
+    {
+      constexpr LO ndofn = 3;
 
-    RCP<Matrix> A = Pr->BuildMatrix();
-    A->SetFixedBlockSize(ndofn);
+      // unrelated to 3 dofs per node; just the smallest matrix that isn't nonzero everywhere in serial
+      GO n = 3 * comm->getSize();
 
-    Level fineLevel;
-    fineLevel.Set("A", A);
-    fineLevel.Set("BlockNumber", blocknumber);
+      Teuchos::ParameterList galeriList;
+      galeriList.set("nx", Teuchos::as<GlobalOrdinal>(n));
+      galeriList.set("ny", Teuchos::as<GlobalOrdinal>(n));
+      galeriList.set("nz", Teuchos::as<GlobalOrdinal>(n));
 
-    Teuchos::ParameterList ibList;
-    RCP<AmalgamationFactory> amalgFact = rcp(new AmalgamationFactory());
-    CoalesceDropFactory_kokkos coalesceDropFact;
-    coalesceDropFact.SetFactory("UnAmalgamationInfo", amalgFact);
-    coalesceDropFact.SetParameter("aggregation: drop scheme", Teuchos::ParameterEntry(std::string("block diagonal")));
-    coalesceDropFact.SetParameter("aggregation: drop tol", Teuchos::ParameterEntry(0.0001));  // 0.0001));
-    coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
+      // node map
+      auto map = Galeri::Xpetra::CreateMap<LO, GO, Node>(lib, "Cartesian3D", comm, galeriList);
+      // dof map
+      map = Xpetra::MapFactory<LO, GO, Node>::Build(map, ndofn);
 
-    // RCP<LWGraph_kokkos> g0 = rcp(new LWGraph_kokkos(A->getCrsGraph(), "original graph"));
-    // g0->print(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)),Teuchos::VERB_EXTREME);
+      RCP<LOVector> blocknumber = Xpetra::VectorFactory<LO, LO, GO, NO>::Build(map);
+      for (size_t row = 0; row < blocknumber->getLocalLength(); row++) {
+        GO global_row = map->getGlobalElement(row);
 
-    /// std::cout << "test line1355\n";
-    fineLevel.Request("Graph", &coalesceDropFact);
-    fineLevel.Request("A", &coalesceDropFact);
-    /// std::cout << "test line1357\n";
-
-    /// TEST_THROW(coalesceDropFact.Build(fineLevel), MueLu::Exceptions::RuntimeError);
-
-    RCP<LWGraph_kokkos> graph_d = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
-
-    /// std::cout << "test line1363\n";
-
-    auto graph          = graph_d->copyToHost();
-    auto numGlobalEdges = graph->GetGlobalNumEdges();
-    /// std::cout << "test line1366\n";
-    auto fullNumGlobalEdges = A->getCrsGraph()->getGlobalNumEntries();
-    /// std::cout << "line1383 unittest Teuchos::as<GO>(fullNumGlobalEdges)\n\t" << Teuchos::as<GO>(fullNumGlobalEdges) << std::endl;  //#
-    /// std::cout << "line1384 unittest Teuchos::as<GO>(numGlobalEdges)\n\t" << Teuchos::as<GO>(numGlobalEdges) << std::endl;          //#
-
-    /// std::cout << "---------------------------------------------------------------------------------\n\t"
-    ///  << "A->getCrsGraph()->describe()\n";
-    // A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-
-    std::cout << "---------------------------------------------------------------------------------\n\t \
-      graph->GetCrsGraph()->describe()\n";
-    graph->GetCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
-
-    // RCP<Matrix> Aout = fineLevel.Get<RCP<Matrix>>("A", &coalesceDropFact);
-
-    /// std::cout << "---------------------------------------------------------------------------------\n\t"
-    ///  << "test line1403 Aout->getCrsGraph()->describe()\n";
-    /// Aout->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-
-    // we drop exactly two off-diagonal blocks each of entry size ?
-    // TEST_EQUALITY(Teuchos::as<GO>(fullNumGlobalEdges-numGlobalEdges) == 2, true);
-    // TEST_EQUALITY(false, true);
-
-    auto graph_h = graph_d->copyToHost();  // LWGraph after dropping
-    LO localBad  = 0;
-
-    auto crsGraph = graph_h->GetCrsGraph();
-
-    // TEST_EQUALITY(crsGraph->getLocalNumRows(), crsGraph->getLocalNumCols())
-
-    /*
-    for(GO i=0; i<crsGraph->getLocalNumRows(); ++i) {
-      Teuchos::ArrayView<const GO> indices;
-      graph->getLocalRowView(i, indices);
-
-      for(int j=0; j<crsGraph->getLocalNumCols()/*<i is sufficient actually*/
-    /*; ++j) {
-if(blocknumber[i] != blocknumber[j])
-if(crsGraph HAS ENTRY I J)
-///std::cout<<"line1422 false"<<std::endl;
-}
-
-for (auto j : indices) {
-if(blocknumber[i] != blocknumber[j]) {
-if()
-}
-if (col == colToCheck)
-return true;
-}
-}
-for(int j=0; j<crsGraph->getLocalNumCols()/*<i is sufficient actually*/
-    /*; ++j) {
-if(blocknumber[i] != blocknumber[j])
-if(crsGraph)
-}*/
-    std::cout << "crsGraph->getLocalNumRows()=" << crsGraph->getLocalNumRows() << std::endl;
-    bool testEmptyBlockDiagonals = true;
-    for (LO i = 0; i < crsGraph->getLocalNumRows(); ++i) {
-      Teuchos::ArrayView<const LO> rowEntries;
-      crsGraph->getLocalRowView(i, rowEntries);
-      /////std::cout<<"line1443"<< std::endl;
-
-      std::unordered_set<LO> rowSet(rowEntries.begin(), rowEntries.end());
-
-      for (LO j = 0; j < i; ++j) {
-        /////std::cout<<"line1448; i,j = "<<i<<","<<j<<"; blocknumber[ndofn*i],blocknumber[ndofn*j] = "<<blocknumber->getData(0)[ndofn*i]<<","<<blocknumber->getData(0)[ndofn*j]<<std::endl;
-        if (blocknumber->getData(0)[ndofn * i] != blocknumber->getData(0)[ndofn * j]) {
-          if (rowSet.find(j) != rowSet.end()) {
-            testEmptyBlockDiagonals = false;
-            std::cout << "\ttest line1451 FALSE" << std::endl;
-          }
-          // else {
-          /////std::cout << "\tTRUE"<<std::endl;
-          //}
+        if (global_row < ndofn * (int)(0.5 * n * n * n)) {
+          // lower part of domain get's 0
+          blocknumber->replaceLocalValue(row, zero);
+        } else {
+          // upper part of domain get's 1
+          blocknumber->replaceLocalValue(row, one);
         }
       }
+
+      RCP<Galeri::Xpetra::Problem<Map, CrsMatrixWrap, MultiVector>> Pr =
+          Galeri::Xpetra::BuildProblem<SC, LO, GO, Map, CrsMatrixWrap, MultiVector>("Elasticity3D", map, galeriList);
+
+      RCP<Matrix> A = Pr->BuildMatrix();
+      A->SetFixedBlockSize(ndofn);
+
+      runAndCheck(A, blocknumber, ndofn, "block diagonal");
+      runAndCheck(A, blocknumber, ndofn, "block diagonal signed classical");
     }
 
-    if (testEmptyBlockDiagonals)
-      std::cout << "testEmptyBlockDiagonals true" << std::endl;
-    else
-      std::cout << "testEmptyBlockDiagonals false" << std::endl;
+    // Elasticity2D, non-contiguous blocknumber, algo = {block diagonal signed classical, block diagonal colored signed classical}
+    {
+      constexpr LO ndofn = 2;
 
-    TEST_EQUALITY(testEmptyBlockDiagonals, true);
+      GO n = 5 * comm->getSize();
 
-    /*
-        GO globalBad = 0;
-        MueLu_sumAll(comm, localBad, globalBad);
-        TEST_EQUALITY(globalBad, 0);
-    */
-    /*
-     // host copies ---------------------------------------------------------------
-     auto graph_h = graph_d->copyToHost();                // RCP<LWGraph_kokkos>
-     auto lgraph  = graph_h->getLocalGraphHost();         // KokkosSparse::StaticCrsGraph
-     auto rowptr  = lgraph.row_map;
-     auto cols    = lgraph.entries;
+      Teuchos::ParameterList galeriList;
+      galeriList.set("nx", Teuchos::as<GlobalOrdinal>(n));
+      galeriList.set("ny", Teuchos::as<GlobalOrdinal>(n));
 
-     auto blkView = blocknumber->getLocalViewHost
-                     (Tpetra::Access::ReadOnly);         // 2-D Kokkos::View
-     LO localBad = 0;
+      // node map
+      auto map = Galeri::Xpetra::CreateMap<LO, GO, Node>(lib, "Cartesian2D", comm, galeriList);
+      // dof map
+      map = Xpetra::MapFactory<LO, GO, Node>::Build(map, ndofn);
 
-     // test ----------------------------------------------------------------------
-     for (LO row = 0; row < static_cast<LO>(rowptr.extent(0) - 1); ++row) {
-       for (auto idx = rowptr(row); idx < rowptr(row + 1); ++idx) {
-         LO col = cols(idx);
-         if (blkView(row,0) != blkView(col,0)) ++localBad;
-       }
-     }
+      // 3 non-contiguous blocks/domains
+      RCP<LOVector> blocknumber = Xpetra::VectorFactory<LO, LO, GO, NO>::Build(map);
+      for (size_t row = 0; row < blocknumber->getLocalLength(); row++) {
+        GO global_row = map->getGlobalElement(row);
+        blocknumber->replaceLocalValue(row, Teuchos::as<SC>(global_row / ndofn % 3));
+      }
 
-     GO globalBad = 0;
-     MueLu_sumAll(*comm, localBad, globalBad);
-     TEST_EQUALITY(globalBad, 0);
- */
-  }
+      RCP<Galeri::Xpetra::Problem<Map, CrsMatrixWrap, MultiVector>> Pr =
+          Galeri::Xpetra::BuildProblem<SC, LO, GO, Map, CrsMatrixWrap, MultiVector>("Elasticity2D", map, galeriList);
+
+      RCP<Matrix> A = Pr->BuildMatrix();
+      A->SetFixedBlockSize(ndofn);
+
+      runAndCheck(A, blocknumber, ndofn, "block diagonal classical");
+      runAndCheck(A, blocknumber, ndofn, "block diagonal colored signed classical");
+    }
+  }  // end block diagonal - dof per node > 1
 }
 
 TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonalClassical, Scalar, LocalOrdinal, GlobalOrdinal, Node) {

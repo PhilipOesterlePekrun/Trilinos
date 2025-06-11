@@ -1220,13 +1220,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
           }
         }
       } else if (algo == "block diagonal") {
-        /// std::cout << "line1223\n";
-        auto BlockNumbers = GetBlockNumberMVs(currentLevel);
-
-        /// std::cout << "line1226 BlockNumbersScalar//##\n";
-        // std::get<0>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-        // std::get<1>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-
+        auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
         auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
 
         MueLu_runDroppingFunctors(block_diagonalize);
@@ -1324,8 +1318,6 @@ template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
 std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrdinal, Node>::boundary_nodes_type> CoalesceDropFactory_kokkos<Scalar, LocalOrdinal, GlobalOrdinal, Node>::
     BuildVector(Level& currentLevel) const {
   FactoryMonitor m(*this, "Build", currentLevel);
-
-  /// std::cout << "line1322//##\n";
 
   using MatrixType        = Xpetra::CrsMatrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>;
   using GraphType         = Xpetra::CrsGraph<LocalOrdinal, GlobalOrdinal, Node>;
@@ -1549,7 +1541,6 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
       auto mark_singletons_as_boundary = Misc::MarkSingletonVectorFunctor(lclA, rowTranslation, boundaryNodes, results);
 
       if (algo == "classical") {
-        /// std::cout << "line1547\n";
         const auto SoC = Misc::SmoothedAggregationMeasure;
 
         if (classicalAlgoStr == "default") {
@@ -1650,34 +1641,34 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
         using doubleMultiVector = Xpetra::MultiVector<typename Teuchos::ScalarTraits<Scalar>::magnitudeType, LO, GO, NO>;
         auto coords             = Get<RCP<doubleMultiVector>>(currentLevel, "Coordinates");
 
-        bool use_block_algorithm   = (algo == "block diagonal classical" || algo == "block diagonal distance laplacian");
+        bool use_block_algorithm = (algo == "block diagonal classical" || algo == "block diagonal distance laplacian");
+        std::cout << "line1645" << std::endl;
         Array<double> dlap_weights = pL.get<Array<double>>("aggregation: distance laplacian directional weights");
         enum { NO_WEIGHTS = 0,
                SINGLE_WEIGHTS,
                BLOCK_WEIGHTS };
         int use_dlap_weights = NO_WEIGHTS;
-        if (algo == "distance laplacian") {
-          LO dim = (LO)coords->getNumVectors();
-          // If anything isn't 1.0 we need to turn on the weighting
-          bool non_unity = false;
-          for (LO i = 0; !non_unity && i < (LO)dlap_weights.size(); i++) {
-            if (dlap_weights[i] != 1.0) {
-              non_unity = true;
-            }
+
+        LO dim = (LO)coords->getNumVectors();
+        // If anything isn't 1.0 we need to turn on the weighting
+        bool non_unity = false;
+        for (LO i = 0; !non_unity && i < (LO)dlap_weights.size(); i++) {
+          if (dlap_weights[i] != 1.0) {
+            non_unity = true;
           }
-          if (non_unity) {
-            LO blocksize = use_block_algorithm ? as<LO>(pL.get<int>("aggregation: block diagonal: interleaved blocksize")) : 1;
-            if ((LO)dlap_weights.size() == dim)
-              use_dlap_weights = SINGLE_WEIGHTS;
-            else if ((LO)dlap_weights.size() == blocksize * dim)
-              use_dlap_weights = BLOCK_WEIGHTS;
-            else {
-              TEUCHOS_TEST_FOR_EXCEPTION(1, Exceptions::RuntimeError,
-                                         "length of 'aggregation: distance laplacian directional weights' must equal the coordinate dimension OR the coordinate dimension times the blocksize");
-            }
-            if (GetVerbLevel() & Statistics1)
-              GetOStream(Statistics1) << "Using distance laplacian weights: " << dlap_weights << std::endl;
+        }
+        if (non_unity) {
+          LO blocksize = use_block_algorithm ? as<LO>(pL.get<int>("aggregation: block diagonal: interleaved blocksize")) : 1;
+          if ((LO)dlap_weights.size() == dim)
+            use_dlap_weights = SINGLE_WEIGHTS;
+          else if ((LO)dlap_weights.size() == blocksize * dim)
+            use_dlap_weights = BLOCK_WEIGHTS;
+          else {
+            TEUCHOS_TEST_FOR_EXCEPTION(1, Exceptions::RuntimeError,
+                                       "length of 'aggregation: distance laplacian directional weights' must equal the coordinate dimension OR the coordinate dimension times the blocksize");
           }
+          if (GetVerbLevel() & Statistics1)
+            GetOStream(Statistics1) << "Using distance laplacian weights: " << dlap_weights << std::endl;
         }
         TEUCHOS_TEST_FOR_EXCEPTION(use_dlap_weights != NO_WEIGHTS, Exceptions::RuntimeError, "Only the NO_WEIGHTS option is implemented for distance laplacian ");
 
@@ -1786,14 +1777,6 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
       } else if (algo == "block diagonal") {
         auto BlockNumbers = GetBlockNumberMVs(currentLevel);
 
-        /// std::cout << "line1784 BlockNumbers//##\n";
-        /// std::get<0>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-        /// std::get<1>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-
-        /// std::cout << "---------------------------------------------------------------------------------\n\t"
-        ///<< "line1790 IN FACTORY: A->getCrsGraph()->describe()\n";
-        // A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
-
         auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
 
         MueLu_runDroppingFunctors(block_diagonalize);
@@ -1810,8 +1793,6 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
   }
   LocalOrdinal nnz_filtered = nnz.first;
   LocalOrdinal nnz_graph    = nnz.second;
-
-  /// std::cout << "line1815, nnz.first=" << nnz.first << ", nnz.second=" << nnz.second << std::endl;
 
   GO numTotal   = lclA.nnz();
   GO numDropped = numTotal - nnz_filtered;
@@ -1865,7 +1846,6 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
 
     filteredA = Xpetra::MatrixFactory<Scalar, LocalOrdinal, GlobalOrdinal, Node>::Build(lclFilteredA, A->getRowMap(), A->getColMap(), A->getDomainMap(), A->getRangeMap());
     filteredA->SetFixedBlockSize(blkSize);
-    /// std::cout << "line1869 blkSize=" << blkSize << std::endl;
 
     if (reuseEigenvalue) {
       // Reuse max eigenvalue from A
