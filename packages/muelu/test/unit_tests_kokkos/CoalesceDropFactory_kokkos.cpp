@@ -1385,8 +1385,15 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
       RCP<Matrix> A = Pr->BuildMatrix();
       A->SetFixedBlockSize(ndofn);
 
+      // runAndCheck(A, blocknumber, ndofn, "block diagonal");
+      // runAndCheck(A, blocknumber, ndofn, "block diagonal signed classical");
+
+      // all
       runAndCheck(A, blocknumber, ndofn, "block diagonal");
       runAndCheck(A, blocknumber, ndofn, "block diagonal signed classical");
+      runAndCheck(A, blocknumber, ndofn, "block diagonal classical");
+      runAndCheck(A, blocknumber, ndofn, "block diagonal colored signed classical");
+      // runAndCheck(A, blocknumber, ndofn, "block diagonal distance laplacian");
     }
 
     // Elasticity2D, non-contiguous blocknumber, algo = {block diagonal signed classical, block diagonal colored signed classical}
@@ -1417,8 +1424,15 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
       RCP<Matrix> A = Pr->BuildMatrix();
       A->SetFixedBlockSize(ndofn);
 
+      // runAndCheck(A, blocknumber, ndofn, "block diagonal classical");
+      // runAndCheck(A, blocknumber, ndofn, "block diagonal colored signed classical");
+
+      // all
+      runAndCheck(A, blocknumber, ndofn, "block diagonal");
+      runAndCheck(A, blocknumber, ndofn, "block diagonal signed classical");
       runAndCheck(A, blocknumber, ndofn, "block diagonal classical");
       runAndCheck(A, blocknumber, ndofn, "block diagonal colored signed classical");
+      // runAndCheck(A, blocknumber, ndofn, "block diagonal distance laplacian");
     }
   }  // end block diagonal - dof per node > 1
 }

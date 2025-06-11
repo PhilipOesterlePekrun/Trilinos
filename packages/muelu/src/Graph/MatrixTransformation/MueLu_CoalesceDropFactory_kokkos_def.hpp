@@ -1540,52 +1540,68 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
       auto preserve_diagonals          = Misc::KeepDiagonalFunctor(lclA, results);
       auto mark_singletons_as_boundary = Misc::MarkSingletonVectorFunctor(lclA, rowTranslation, boundaryNodes, results);
 
-      if (algo == "classical") {
+      if (algo == "classical" || algo == "block diagonal classical") {
         const auto SoC = Misc::SmoothedAggregationMeasure;
+        if (algo == "block diagonal classical") {
+          auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
+          auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
 
-        if (classicalAlgoStr == "default") {
-          auto classical_dropping = ClassicalDropping::make_drop_functor<SoC>(*A, threshold, results);
+          if (classicalAlgoStr == "default") {
+            auto classical_dropping = ClassicalDropping::make_drop_functor<SoC>(*A, threshold, results);
 
-          if (aggregationMayCreateDirichlet) {
-            MueLu_runDroppingFunctors(classical_dropping,
-                                      // drop_boundaries,
-                                      preserve_diagonals,
-                                      mark_singletons_as_boundary);
+            if (aggregationMayCreateDirichlet) {
+              MueLu_runDroppingFunctors(block_diagonalize,
+                                        classical_dropping,
+                                        // drop_boundaries,
+                                        preserve_diagonals,
+                                        mark_singletons_as_boundary);
+            } else {
+              MueLu_runDroppingFunctors(block_diagonalize,
+                                        classical_dropping,
+                                        // drop_boundaries,
+                                        preserve_diagonals);
+            }
+          } else if (classicalAlgoStr == "unscaled cut") {
+            TEUCHOS_ASSERT(false);
+          } else if (classicalAlgoStr == "scaled cut") {
+            TEUCHOS_ASSERT(false);
+          } else if (classicalAlgoStr == "scaled cut symmetric") {
+            TEUCHOS_ASSERT(false);
           } else {
-            MueLu_runDroppingFunctors(classical_dropping,
-                                      // drop_boundaries,
-                                      preserve_diagonals);
+            TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::RuntimeError, "\"aggregation: classical algo\" must be one of (default|unscaled cut|scaled cut|scaled cut symmetric), not \"" << classicalAlgoStr << "\"");
           }
-        } else if (classicalAlgoStr == "unscaled cut") {
-          TEUCHOS_ASSERT(false);
-        } else if (classicalAlgoStr == "scaled cut") {
-          TEUCHOS_ASSERT(false);
-        } else if (classicalAlgoStr == "scaled cut symmetric") {
-          TEUCHOS_ASSERT(false);
         } else {
-          TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::RuntimeError, "\"aggregation: classical algo\" must be one of (default|unscaled cut|scaled cut|scaled cut symmetric), not \"" << classicalAlgoStr << "\"");
+          if (classicalAlgoStr == "default") {
+            auto classical_dropping = ClassicalDropping::make_drop_functor<SoC>(*A, threshold, results);
+
+            if (aggregationMayCreateDirichlet) {
+              MueLu_runDroppingFunctors(classical_dropping,
+                                        // drop_boundaries,
+                                        preserve_diagonals,
+                                        mark_singletons_as_boundary);
+            } else {
+              MueLu_runDroppingFunctors(classical_dropping,
+                                        // drop_boundaries,
+                                        preserve_diagonals);
+            }
+          } else if (classicalAlgoStr == "unscaled cut") {
+            TEUCHOS_ASSERT(false);
+          } else if (classicalAlgoStr == "scaled cut") {
+            TEUCHOS_ASSERT(false);
+          } else if (classicalAlgoStr == "scaled cut symmetric") {
+            TEUCHOS_ASSERT(false);
+          } else {
+            TEUCHOS_TEST_FOR_EXCEPTION(true, Exceptions::RuntimeError, "\"aggregation: classical algo\" must be one of (default|unscaled cut|scaled cut|scaled cut symmetric), not \"" << classicalAlgoStr << "\"");
+          }
         }
       } else if (algo == "signed classical" || algo == "block diagonal colored signed classical" || algo == "block diagonal signed classical") {
         const auto SoC = Misc::SignedRugeStuebenMeasure;
 
         auto signed_classical_rs_dropping = ClassicalDropping::make_drop_functor<SoC>(*A, threshold, results);
 
-        /*if (aggregationMayCreateDirichlet) {
-          MueLu_runDroppingFunctors(signed_classical_rs_dropping,
-                                    // drop_boundaries,
-                                    preserve_diagonals,
-                                    mark_singletons_as_boundary);
-
-        } else {
-          MueLu_runDroppingFunctors(signed_classical_rs_dropping,
-                                    // drop_boundaries,
-                                    preserve_diagonals);
-        }*/
-
         if (algo == "block diagonal signed classical" || algo == "block diagonal colored signed classical") {
           auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
           auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
-          /////##DistanceLaplacian::make_vector_drop_functor<SoC>(*A, *mergedA, threshold, dist2, results, rowTranslation, colTranslation);
 
           if (classicalAlgoStr == "default") {
             if (aggregationMayCreateDirichlet) {
@@ -1641,8 +1657,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
         using doubleMultiVector = Xpetra::MultiVector<typename Teuchos::ScalarTraits<Scalar>::magnitudeType, LO, GO, NO>;
         auto coords             = Get<RCP<doubleMultiVector>>(currentLevel, "Coordinates");
 
-        bool use_block_algorithm = (algo == "block diagonal classical" || algo == "block diagonal distance laplacian");
-        std::cout << "line1645" << std::endl;
+        bool use_block_algorithm   = (algo == "block diagonal classical" || algo == "block diagonal distance laplacian");
         Array<double> dlap_weights = pL.get<Array<double>>("aggregation: distance laplacian directional weights");
         enum { NO_WEIGHTS = 0,
                SINGLE_WEIGHTS,
