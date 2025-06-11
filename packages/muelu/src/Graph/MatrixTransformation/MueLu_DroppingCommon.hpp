@@ -314,14 +314,14 @@ class BlockDiagonalizeFunctor {
     const size_t offset = A.graph.row_map(rlid);
     for (local_ordinal_type k = 0; k < row.length; ++k) {
       auto clid = row.colidx(k);
-      std::cout << "DroppingCommon; rlid=" << rlid << ", clid=" << clid << ", k=" << k << "offset=" << offset << std::endl;
-      std::cout << "\tpoint_to_block(rlid, 0)=" << point_to_block(rlid, 0) << ", ghosted_point_to_block(clid, 0)=" << ghosted_point_to_block(clid, 0) << std::endl;
+      // std::cout << "DroppingCommon; rlid=" << rlid << ", clid=" << clid << ", k=" << k << "offset=" << offset << std::endl;
+      // std::cout << "\tpoint_to_block(rlid, 0)=" << point_to_block(rlid, 0) << ", ghosted_point_to_block(clid, 0)=" << ghosted_point_to_block(clid, 0) << std::endl;
       if (point_to_block(rlid, 0) == ghosted_point_to_block(clid, 0)) {
         results(offset + k) = Kokkos::max(KEEP, results(offset + k));
-        std::cout << "\tKEEP" << std::endl;
+        // std::cout << "\tKEEP" << std::endl;
       } else {
         results(offset + k) = Kokkos::max(DROP, results(offset + k));
-        std::cout << "\tDROP" << std::endl;
+        // std::cout << "\tDROP" << std::endl;
       }
     }
   }

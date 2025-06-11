@@ -1299,11 +1299,11 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
     auto numGlobalEdges         = graph->GetGlobalNumEdges();
     auto fullNumGlobalEdges     = A->getCrsGraph()->getGlobalNumEntries();
 
-    std::cout << "1dof: graph->GetCrsGraph()->describe()\n";
-    graph->GetCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+    /// std::cout << "1dof: graph->GetCrsGraph()->describe()\n";
+    /// graph->GetCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
 
-    std::cout << "1dof: A->getCrsGraph()->describe()\n";
-    A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+    /// std::cout << "1dof: A->getCrsGraph()->describe()\n";
+    /// A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
 
     // we drop exactly two off-diagonal blocks each of entry size n
     TEST_EQUALITY(Teuchos::as<GO>(fullNumGlobalEdges - numGlobalEdges) == 2 * n, true);
@@ -1312,7 +1312,8 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
   // block diagonal - 3 dof per node
   {
     constexpr int ndofn = 3;
-    // unrelated to 3 dofs per node; just a small "sparse" matrix
+
+    // unrelated to 3 dofs per node; just a small matrix that isn't nonzero everywhere
     GO n = 3 * comm->getSize();
 
     Teuchos::ParameterList galeriList;
@@ -1322,15 +1323,15 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
 
     auto map = Galeri::Xpetra::CreateMap<LO, GO, Node>(lib, "Cartesian3D", comm, galeriList);
 
-    std::cout << "---------------------------------------------------------------------------------\n\t"
-              << "PRE map->describe()\n";
-    map->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+    /// std::cout << "---------------------------------------------------------------------------------\n\t"
+    ///<< "PRE map->describe()\n";
+    /// map->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
 
     map = Xpetra::MapFactory<LO, GO, Node>::Build(map, ndofn);  //## this has to be before blocknumber is built from it ofc
 
-    std::cout << "---------------------------------------------------------------------------------\n\t"
-              << "POST map->describe()\n";
-    map->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+    /// std::cout << "---------------------------------------------------------------------------------\n\t"
+    ///<< "POST map->describe()\n";
+    /// map->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
 
     RCP<LOVector> blocknumber = Xpetra::VectorFactory<LO, LO, GO, NO>::Build(map);
 
@@ -1367,68 +1368,111 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
     coalesceDropFact.SetDefaultVerbLevel(MueLu::Extreme);
 
     // RCP<LWGraph_kokkos> g0 = rcp(new LWGraph_kokkos(A->getCrsGraph(), "original graph"));
-    // g0->print(*Teuchos::getFancyOStream(rcpFromRef(std::cout)),Teuchos::VERB_EXTREME);
+    // g0->print(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)),Teuchos::VERB_EXTREME);
 
-    std::cout << "test line1355\n";
+    /// std::cout << "test line1355\n";
     fineLevel.Request("Graph", &coalesceDropFact);
     fineLevel.Request("A", &coalesceDropFact);
-    std::cout << "test line1357\n";
+    /// std::cout << "test line1357\n";
 
     /// TEST_THROW(coalesceDropFact.Build(fineLevel), MueLu::Exceptions::RuntimeError);
 
     RCP<LWGraph_kokkos> graph_d = fineLevel.Get<RCP<LWGraph_kokkos>>("Graph", &coalesceDropFact);
-    std::cout << "graph_d->print()\n";
-    graph_d->print(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
-    std::cout << "test line1363\n";
+    /// std::cout << "test line1363\n";
 
     auto graph          = graph_d->copyToHost();
     auto numGlobalEdges = graph->GetGlobalNumEdges();
-    std::cout << "test line1366\n";
+    /// std::cout << "test line1366\n";
     auto fullNumGlobalEdges = A->getCrsGraph()->getGlobalNumEntries();
-    std::cout << "line1383 unittest Teuchos::as<GO>(fullNumGlobalEdges)\n\t" << Teuchos::as<GO>(fullNumGlobalEdges) << std::endl;  //#
-    std::cout << "line1384 unittest Teuchos::as<GO>(numGlobalEdges)\n\t" << Teuchos::as<GO>(numGlobalEdges) << std::endl;          //#
+    /// std::cout << "line1383 unittest Teuchos::as<GO>(fullNumGlobalEdges)\n\t" << Teuchos::as<GO>(fullNumGlobalEdges) << std::endl;  //#
+    /// std::cout << "line1384 unittest Teuchos::as<GO>(numGlobalEdges)\n\t" << Teuchos::as<GO>(numGlobalEdges) << std::endl;          //#
 
-    std::cout << "---------------------------------------------------------------------------------\n\t"
-              << "A->describe()\n";
-    A->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
-
-    std::cout << "---------------------------------------------------------------------------------\n\t"
-              << "A->getCrsGraph()->describe()\n";
-    A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+    /// std::cout << "---------------------------------------------------------------------------------\n\t"
+    ///  << "A->getCrsGraph()->describe()\n";
+    // A->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
 
     std::cout << "---------------------------------------------------------------------------------\n\t \
       graph->GetCrsGraph()->describe()\n";
     graph->GetCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
-    RCP<Matrix> Aout = fineLevel.Get<RCP<Matrix>>("A", &coalesceDropFact);
+    // RCP<Matrix> Aout = fineLevel.Get<RCP<Matrix>>("A", &coalesceDropFact);
 
-    std::cout << "---------------------------------------------------------------------------------\n\t"
-              << "test line1403 Aout->getCrsGraph()->describe()\n";
-    Aout->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
+    /// std::cout << "---------------------------------------------------------------------------------\n\t"
+    ///  << "test line1403 Aout->getCrsGraph()->describe()\n";
+    /// Aout->getCrsGraph()->describe(*Teuchos::getFancyOStream(rcpFromRef(///std::cout)), Teuchos::VERB_EXTREME);
 
     // we drop exactly two off-diagonal blocks each of entry size ?
     // TEST_EQUALITY(Teuchos::as<GO>(fullNumGlobalEdges-numGlobalEdges) == 2, true);
-    TEST_EQUALITY(false, true);
+    // TEST_EQUALITY(false, true);
 
     auto graph_h = graph_d->copyToHost();  // LWGraph after dropping
     LO localBad  = 0;
 
-    for (LO row = 0; row < static_cast<LO>(graph_h->GetNodeNumVertices()); ++row) {
-      // GraphRowViewConst (length + operator()(i) accessor)
-      auto neigh = graph_h->getNeighborVertices(row);
+    auto crsGraph = graph_h->GetCrsGraph();
 
-      for (size_t k = 0; k < neigh.length; ++k) {
-        LO col = neigh(k);
-        if (blocknumber->getData(0)[row] != blocknumber->getData(0)[col])
-          ++localBad;
+    // TEST_EQUALITY(crsGraph->getLocalNumRows(), crsGraph->getLocalNumCols())
+
+    /*
+    for(GO i=0; i<crsGraph->getLocalNumRows(); ++i) {
+      Teuchos::ArrayView<const GO> indices;
+      graph->getLocalRowView(i, indices);
+
+      for(int j=0; j<crsGraph->getLocalNumCols()/*<i is sufficient actually*/
+    /*; ++j) {
+if(blocknumber[i] != blocknumber[j])
+if(crsGraph HAS ENTRY I J)
+///std::cout<<"line1422 false"<<std::endl;
+}
+
+for (auto j : indices) {
+if(blocknumber[i] != blocknumber[j]) {
+if()
+}
+if (col == colToCheck)
+return true;
+}
+}
+for(int j=0; j<crsGraph->getLocalNumCols()/*<i is sufficient actually*/
+    /*; ++j) {
+if(blocknumber[i] != blocknumber[j])
+if(crsGraph)
+}*/
+    std::cout << "crsGraph->getLocalNumRows()=" << crsGraph->getLocalNumRows() << std::endl;
+    bool testEmptyBlockDiagonals = true;
+    for (LO i = 0; i < crsGraph->getLocalNumRows(); ++i) {
+      Teuchos::ArrayView<const LO> rowEntries;
+      crsGraph->getLocalRowView(i, rowEntries);
+      /////std::cout<<"line1443"<< std::endl;
+
+      std::unordered_set<LO> rowSet(rowEntries.begin(), rowEntries.end());
+
+      for (LO j = 0; j < i; ++j) {
+        /////std::cout<<"line1448; i,j = "<<i<<","<<j<<"; blocknumber[ndofn*i],blocknumber[ndofn*j] = "<<blocknumber->getData(0)[ndofn*i]<<","<<blocknumber->getData(0)[ndofn*j]<<std::endl;
+        if (blocknumber->getData(0)[ndofn * i] != blocknumber->getData(0)[ndofn * j]) {
+          if (rowSet.find(j) != rowSet.end()) {
+            testEmptyBlockDiagonals = false;
+            std::cout << "\ttest line1451 FALSE" << std::endl;
+          }
+          // else {
+          /////std::cout << "\tTRUE"<<std::endl;
+          //}
+        }
       }
     }
 
-    GO globalBad = 0;
-    MueLu_sumAll(comm, localBad, globalBad);
-    TEST_EQUALITY(globalBad, 0);
+    if (testEmptyBlockDiagonals)
+      std::cout << "testEmptyBlockDiagonals true" << std::endl;
+    else
+      std::cout << "testEmptyBlockDiagonals false" << std::endl;
 
+    TEST_EQUALITY(testEmptyBlockDiagonals, true);
+
+    /*
+        GO globalBad = 0;
+        MueLu_sumAll(comm, localBad, globalBad);
+        TEST_EQUALITY(globalBad, 0);
+    */
     /*
      // host copies ---------------------------------------------------------------
      auto graph_h = graph_d->copyToHost();                // RCP<LWGraph_kokkos>
