@@ -340,6 +340,7 @@ class BlockDiagonalizeVectorFunctor {
   using local_block_indices_view_type = typename block_indices_type::dual_view_type_const::t_dev;
   using results_view                  = Kokkos::View<DecisionType*, memory_space>;
   using id_translation_type           = Kokkos::View<local_ordinal_type*, memory_space>;
+  using map_type                      = Xpetra::Map<LocalOrdinal, GlobalOrdinal, Node>;
 
   local_matrix_type A;
   local_block_indices_view_type point_to_block;
@@ -349,18 +350,20 @@ class BlockDiagonalizeVectorFunctor {
   id_translation_type col_translation;
 
  public:  //#*A, *mergedA, blocknumber, results, rowTranslation, colTranslation
-  BlockDiagonalizeVectorFunctor(matrix_type& A_, matrix_type& mergedA_, block_indices_type& block_numbers_, results_view& results_, id_translation_type row_translation_, id_translation_type col_translation_)
+  BlockDiagonalizeVectorFunctor(matrix_type& A_, /* matrix_type& mergedA_,*/ block_indices_type& point_to_block_, Teuchos::RCP<const map_type> non_unique_map_, results_view& results_, id_translation_type row_translation_, id_translation_type col_translation_)
     : A(A_.getLocalMatrixDevice())
-    , point_to_block(block_numbers_.getLocalViewDevice(Xpetra::Access::ReadOnly))
+    , point_to_block(point_to_block_.getLocalViewDevice(Xpetra::Access::ReadOnly))
     ///, ghosted_point_to_block(block_numbers_ghosted_.getLocalViewDevice(Xpetra::Access::ReadOnly))
     , results(results_)
     , row_translation(row_translation_)
     , col_translation(col_translation_) {
-    auto importer = mergedA_.getCrsGraph()->getImporter();
+    /// auto importer = mergedA_.getCrsGraph()->getImporter();
+
+    auto importer = Xpetra::ImportFactory<LocalOrdinal, GlobalOrdinal, Node>::Build(point_to_block_.getMap(), non_unique_map_);
 
     if (!importer.is_null()) {
       auto ghosted_point_to_blockMV = Xpetra::VectorFactory<LocalOrdinal, LocalOrdinal, GlobalOrdinal, Node>::Build(importer->getTargetMap());
-      ghosted_point_to_blockMV->doImport(block_numbers_, *importer, Xpetra::INSERT);
+      ghosted_point_to_blockMV->doImport(point_to_block_, *importer, Xpetra::INSERT);
       ghosted_point_to_block = ghosted_point_to_blockMV->getLocalViewDevice(Xpetra::Access::ReadOnly);
     } else {
       ghosted_point_to_block = point_to_block;

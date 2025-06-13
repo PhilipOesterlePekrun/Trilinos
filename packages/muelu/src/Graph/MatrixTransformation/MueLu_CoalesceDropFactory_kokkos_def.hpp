@@ -1682,7 +1682,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
           /// auto BlockNumbers = GetBlockNumberMVs(currentLevel);
           RCP<LocalOrdinalVector> BlockNumber = Get<RCP<LocalOrdinalVector>>(currentLevel, "BlockNumber");
 
-          auto block_diagonalize = Misc::BlockDiagonalizeVectorFunctor(*A, *mergedA, *BlockNumber, results, rowTranslation, colTranslation);
+          auto block_diagonalize = Misc::BlockDiagonalizeVectorFunctor(*A, *BlockNumber, nonUniqueMap, results, rowTranslation, colTranslation);
 
           MueLu_runDroppingFunctors(block_diagonalize);
 
