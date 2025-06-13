@@ -333,45 +333,49 @@ class BlockDiagonalizeVectorFunctor {
   using matrix_type       = Xpetra::Matrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>;
   using local_matrix_type = typename matrix_type::local_matrix_type;
 
-  using scalar_type        = typename local_matrix_type::value_type;
-  using local_ordinal_type = typename local_matrix_type::ordinal_type;
-  using memory_space       = typename local_matrix_type::memory_space;
-  using results_view       = Kokkos::View<DecisionType*, memory_space>;
-  /// typedef typename Kokkos::View<LocalOrdinal*, typename Node::device_type> id_translation_type;
-  /// using id_translation_type = typename Kokkos::View<LocalOrdinal*, typename Node::device_type>;
-  using id_translation_type = Kokkos::View<local_ordinal_type*, memory_space>;
-
-  using block_indices_type            = Xpetra::MultiVector<LocalOrdinal, LocalOrdinal, GlobalOrdinal, Node>;
+  using scalar_type                   = typename local_matrix_type::value_type;
+  using local_ordinal_type            = typename local_matrix_type::ordinal_type;
+  using memory_space                  = typename local_matrix_type::memory_space;
+  using block_indices_type            = Xpetra::Vector<LocalOrdinal, LocalOrdinal, GlobalOrdinal, Node>;
   using local_block_indices_view_type = typename block_indices_type::dual_view_type_const::t_dev;
+  using results_view                  = Kokkos::View<DecisionType*, memory_space>;
+  using id_translation_type           = Kokkos::View<local_ordinal_type*, memory_space>;
 
   local_matrix_type A;
   local_block_indices_view_type point_to_block;
   local_block_indices_view_type ghosted_point_to_block;
   results_view results;
-
   id_translation_type row_translation;
   id_translation_type col_translation;
 
  public:  //#*A, *mergedA, blocknumber, results, rowTranslation, colTranslation
-  BlockDiagonalizeVectorFunctor(matrix_type& A_, /* matrix_type& mergedA_,*/ block_indices_type& block_numbers_, block_indices_type& block_numbers_ghosted_, results_view& results_, id_translation_type row_translation_, id_translation_type col_translation_)
+  BlockDiagonalizeVectorFunctor(matrix_type& A_, matrix_type& mergedA_, block_indices_type& block_numbers_, results_view& results_, id_translation_type row_translation_, id_translation_type col_translation_)
     : A(A_.getLocalMatrixDevice())
     , point_to_block(block_numbers_.getLocalViewDevice(Xpetra::Access::ReadOnly))
-    , ghosted_point_to_block(block_numbers_ghosted_.getLocalViewDevice(Xpetra::Access::ReadOnly))
+    ///, ghosted_point_to_block(block_numbers_ghosted_.getLocalViewDevice(Xpetra::Access::ReadOnly))
     , results(results_)
     , row_translation(row_translation_)
     , col_translation(col_translation_) {
-    //# here put kind of what blocknumbersmv does
+    auto importer = mergedA_.getCrsGraph()->getImporter();
+
+    if (!importer.is_null()) {
+      auto ghosted_point_to_blockMV = Xpetra::VectorFactory<LocalOrdinal, LocalOrdinal, GlobalOrdinal, Node>::Build(importer->getTargetMap());
+      ghosted_point_to_blockMV->doImport(block_numbers_, *importer, Xpetra::INSERT);
+      ghosted_point_to_block = ghosted_point_to_blockMV->getLocalViewDevice(Xpetra::Access::ReadOnly);
+    } else {
+      ghosted_point_to_block = point_to_block;
+    }
   }
 
   KOKKOS_FORCEINLINE_FUNCTION
   void operator()(local_ordinal_type rlid) const {
     auto row            = A.rowConst(rlid);
-    const size_t offset = A.graph.row_map(rlid);  // results is a flat array, so we need
+    const size_t offset = A.graph.row_map(rlid);  //# results is a flat array, so we need
     auto brlid          = row_translation(rlid);  //# nodal
     for (local_ordinal_type k = 0; k < row.length; ++k) {
       auto clid  = row.colidx(k);
       auto bclid = col_translation(clid);  //# nodal
-      std::cout << "k=" << k << ",rlid=" << rlid << ",brlid=" << brlid << ",clid=" << clid << ",bclid=" << bclid << std::endl;
+      ///#std::cout << "k=" << k << ",rlid=" << rlid << ",brlid=" << brlid << ",clid=" << clid << ",bclid=" << bclid << std::endl;
       if (point_to_block(brlid, 0) == ghosted_point_to_block(bclid, 0)) {
         results(offset + k) = Kokkos::max(KEEP, results(offset + k));  //# DROP = 2, KEEP = 1, SO DROP > KEEP; so if its already dropped, do nothing; meanwhile BOUNDARY = 3 is highest, so if boundary then it doesnt get reset
       } else {
