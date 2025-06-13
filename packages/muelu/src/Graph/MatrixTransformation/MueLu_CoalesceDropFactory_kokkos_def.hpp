@@ -1792,7 +1792,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
       } else if (algo == "block diagonal") {
         auto BlockNumbers = GetBlockNumberMVs(currentLevel);
 
-        auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
+        auto block_diagonalize = Misc::BlockDiagonalizeVectorFunctor(*A, /* *mergedA,*/ *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results, rowTranslation, colTranslation);
 
         MueLu_runDroppingFunctors(block_diagonalize);
       } else {
