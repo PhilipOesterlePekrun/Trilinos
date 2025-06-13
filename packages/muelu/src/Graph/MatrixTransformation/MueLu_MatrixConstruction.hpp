@@ -207,7 +207,7 @@ class PointwiseCountingFunctor<local_matrix_type, functor_type> {
     }
 #endif
 
-    functor(rlid);
+    functor(rlid);  //# this alters results because results here is shared. this is not really exposed/shown here...
 
 #ifdef MUELU_COALESCE_DROP_DEBUG
     Kokkos::printf("%s\n", functorName);

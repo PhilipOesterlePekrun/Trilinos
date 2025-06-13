@@ -20,6 +20,8 @@
 #include "MueLu_AmalgamationFactory.hpp"
 #include "MueLu_LWGraph_kokkos.hpp"
 
+#include "MueLu_AmalgamationInfo.hpp"  //#
+
 #include <Galeri_XpetraParameters.hpp>
 
 namespace MueLuTests {
@@ -1241,6 +1243,12 @@ TEUCHOS_UNIT_TEST_TEMPLATE_4_DECL(CoalesceDropFactory_kokkos, BlockDiagonal, Sca
       fineLevel.Request("Graph", &coalesceDropFact);
       fineLevel.Request("A", &coalesceDropFact);
       fineLevel.Request("DofsPerNode", &coalesceDropFact);
+
+      fineLevel.Request("UnAmalgamationInfo", amalgFact.get());
+      RCP<AmalgamationInfo> unAmalgInfo = fineLevel.Get<RCP<AmalgamationInfo>>("UnAmalgamationInfo", amalgFact.get());
+      std::cout << "unAmalgInfo->print();" << std::endl;
+      unAmalgInfo->print(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout)), MueLu::Extreme);
+      //#std::get<0>(BlockNumbers)->describe(*Teuchos::getFancyOStream(Teuchos::rcpFromRef(std::cout)), Teuchos::VERB_EXTREME);
 
       LO myDofsPerNode = fineLevel.Get<LO>("DofsPerNode", &coalesceDropFact);
       TEST_EQUALITY(Teuchos::as<int>(myDofsPerNode) == ndofn, true);

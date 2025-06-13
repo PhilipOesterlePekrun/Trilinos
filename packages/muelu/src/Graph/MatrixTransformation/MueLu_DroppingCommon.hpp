@@ -324,6 +324,62 @@ class BlockDiagonalizeFunctor {
 };
 
 /*!
+@class BlockDiagonalizeVectorFunctor
+@brief Functor that drops all entries that are not on the block diagonal.
+*/
+template <class Scalar, class LocalOrdinal, class GlobalOrdinal, class Node>
+class BlockDiagonalizeVectorFunctor {
+ private:
+  using matrix_type       = Xpetra::Matrix<Scalar, LocalOrdinal, GlobalOrdinal, Node>;
+  using local_matrix_type = typename matrix_type::local_matrix_type;
+
+  using scalar_type        = typename local_matrix_type::value_type;
+  using local_ordinal_type = typename local_matrix_type::ordinal_type;
+  using memory_space       = typename local_matrix_type::memory_space;
+  using results_view       = Kokkos::View<DecisionType*, memory_space>;
+  /// typedef typename Kokkos::View<LocalOrdinal*, typename Node::device_type> id_translation_type;
+  using id_translation_type = Kokkos::View<LocalOrdinal*, typename Node::device_type>;
+
+  using block_indices_type            = Xpetra::MultiVector<LocalOrdinal, LocalOrdinal, GlobalOrdinal, Node>;
+  using local_block_indices_view_type = typename block_indices_type::dual_view_type_const::t_dev;
+
+  local_matrix_type A;
+  local_block_indices_view_type point_to_block;
+  local_block_indices_view_type ghosted_point_to_block;
+  results_view results;
+
+  id_translation_type row_translation;
+  id_translation_type col_translation;
+
+ public:  //#*A, *mergedA, blocknumber, results, rowTranslation, colTranslation
+  BlockDiagonalizeVectorFunctor(matrix_type& A_, matrix_type& mergedA_, block_indices_type& block_numbers_, block_indices_type& block_numbers_ghosted_, results_view& results_, const id_translation_type& row_translation_, const id_translation_type& col_translation_)
+    : A(A_.getLocalMatrixDevice())
+    , point_to_block(block_numbers_.getLocalViewDevice(Xpetra::Access::ReadOnly))
+    , ghosted_point_to_block(block_numbers_ghosted_.getLocalViewDevice(Xpetra::Access::ReadOnly))
+    , results(results_)
+    , row_translation(row_translation_)
+    , col_translation(col_translation_) {
+    //# here put kind of what blocknumbersmv does
+  }
+
+  KOKKOS_FORCEINLINE_FUNCTION
+  void operator()(local_ordinal_type rlid) const {
+    auto row            = A.rowConst(rlid);
+    const size_t offset = A.graph.row_map(rlid);  // results is a flat array, so we need
+    auto brlid          = rowTranslation(rlid);   //# nodal
+    auto bclid          = colTranslation(clid);   //# nodal
+    for (local_ordinal_type k = 0; k < row.length; ++k) {
+      auto clid = row.colidx(k);
+      if (point_to_block(brlid, 0) == ghosted_point_to_block(bclid, 0)) {
+        results(offset + k) = Kokkos::max(KEEP, results(offset + k));  //# DROP = 2, KEEP = 1, SO DROP > KEEP; so if its already dropped, do nothing; meanwhile BOUNDARY = 3 is highest, so if boundary then it doesnt get reset
+      } else {
+        results(offset + k) = Kokkos::max(DROP, results(offset + k));
+      }
+    }
+  }
+};
+
+/*!
 @class DebugFunctor
 @brief Functor that checks that all entries have been marked.
 */

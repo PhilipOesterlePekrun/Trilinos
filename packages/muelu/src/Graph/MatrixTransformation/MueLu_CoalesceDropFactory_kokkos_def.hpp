@@ -1220,10 +1220,10 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
           }
         }
       } else if (algo == "block diagonal") {
-        auto BlockNumbers      = GetBlockNumberMVs(currentLevel);
-        auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
+        /// auto BlockNumbers      = GetBlockNumberMVs(currentLevel, /*importer out of A*/); //# merge GetBlockNumberMVs() into BlockDiagonalizeFunctor()
+        /// auto block_diagonalize = Misc::BlockDiagonalizeFunctor(*A, *std::get<0>(BlockNumbers), *std::get<1>(BlockNumbers), results);
 
-        MueLu_runDroppingFunctors(block_diagonalize);
+        /// MueLu_runDroppingFunctors(block_diagonalize);
       } else {
         TEUCHOS_ASSERT(false);
       }
@@ -1717,7 +1717,7 @@ std::tuple<GlobalOrdinal, typename MueLu::LWGraph_kokkos<LocalOrdinal, GlobalOrd
 
           if (distanceLaplacianMetric == "unweighted") {
             auto dist2                   = DistanceLaplacian::UnweightedDistanceFunctor(*mergedA, coords);
-            auto dist_laplacian_dropping = DistanceLaplacian::make_vector_drop_functor<SoC>(*A, *mergedA, threshold, dist2, results, rowTranslation, colTranslation);
+            auto dist_laplacian_dropping = DistanceLaplacian::make_vector_drop_functor<SoC>(*A, *mergedA, threshold, dist2, results, rowTranslation, colTranslation);  //# for blockdiagonolize: (*A, *mergedA, blocknumber, results, rowTranslation, colTranslation)
 
             if (aggregationMayCreateDirichlet) {
               MueLu_runDroppingFunctors(dist_laplacian_dropping,
