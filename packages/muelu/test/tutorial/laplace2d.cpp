@@ -84,12 +84,10 @@
 
 #include <Xpetra_Map.hpp>
 
-int main (int argc, char *argv[])
-{
+int main(int argc, char* argv[]) {
   bool success = false;
-  try
-  {
-    Tpetra::ScopeGuard tpetraScope (&argc, &argv);
+  try {
+    Tpetra::ScopeGuard tpetraScope(&argc, &argv);
     {
       //! [TpetraTemplateParameters begin]
       using SC = Tpetra::MultiVector<>::scalar_type;
@@ -107,56 +105,62 @@ int main (int argc, char *argv[])
       using Teuchos::rcp;
       using Teuchos::TimeMonitor;
 
-      using CrsMatrix = Tpetra::CrsMatrix<>;
-      using Map = Tpetra::Map<>;
+      using CrsMatrix   = Tpetra::CrsMatrix<>;
+      using Map         = Tpetra::Map<>;
       using MultiVector = Tpetra::MultiVector<>;
-      using Operator = Tpetra::Operator<>;
+      using Operator    = Tpetra::Operator<>;
 
-      using STS = Teuchos::ScalarTraits<SC>;
+      using STS            = Teuchos::ScalarTraits<SC>;
       using magnitude_type = typename Teuchos::ScalarTraits<SC>::magnitudeType;
 
-      using real_type = typename STS::coordinateType;
-      using RealValuedMultiVector = Tpetra::MultiVector<real_type,LO,GO,NO>;
+      using real_type             = typename STS::coordinateType;
+      using RealValuedMultiVector = Tpetra::MultiVector<real_type, LO, GO, NO>;
 
       const SC one = Teuchos::ScalarTraits<SC>::one();
       //! [UsingStatements end]
 
       //! [CommunicatorObject begin]
       RCP<const Teuchos::Comm<int>> comm = Teuchos::DefaultComm<int>::getComm();
-      int MyPID = comm->getRank();
-      int NumProc = comm->getSize();
-      (void) MyPID;   // unused void pointer cast to avoid unused variable warnings
-      (void) NumProc; // unused void pointer cast to avoid unused variable warnings
+      int MyPID                          = comm->getRank();
+      int NumProc                        = comm->getSize();
+      (void)MyPID;    // unused void pointer cast to avoid unused variable warnings
+      (void)NumProc;  // unused void pointer cast to avoid unused variable warnings
       //! [CommunicatorObject end]
 
       // Instead of checking each time for rank, create a rank 0 stream
       RCP<Teuchos::FancyOStream> fancy = Teuchos::fancyOStream(Teuchos::rcpFromRef(std::cout));
-      Teuchos::FancyOStream& fancyout = *fancy;
+      Teuchos::FancyOStream& fancyout  = *fancy;
       fancyout.setOutputToRootOnly(0);
 
       // ================================
       // Parameters initialization
       // ================================
       Teuchos::CommandLineProcessor clp(false);
-      GO nx                    = 100;   clp.setOption("nx",                       &nx, "mesh size in x direction");
-      GO ny                    = 100;   clp.setOption("ny",                       &ny, "mesh size in y direction");
-      std::string xmlFileName  = "";    clp.setOption("xml",             &xmlFileName, "read parameters from a file");
-      int mgridSweeps          = 1;     clp.setOption("mgridSweeps",     &mgridSweeps, "number of multigrid sweeps within Multigrid solver.");
-      std::string printTimings = "no";  clp.setOption("timings",        &printTimings, "print timings to screen [yes/no]");
-      double tol               = 1e-12; clp.setOption("tol",                     &tol, "solver convergence tolerance");
+      GO nx = 100;
+      clp.setOption("nx", &nx, "mesh size in x direction");
+      GO ny = 100;
+      clp.setOption("ny", &ny, "mesh size in y direction");
+      std::string xmlFileName = "";
+      clp.setOption("xml", &xmlFileName, "read parameters from a file");
+      int mgridSweeps = 1;
+      clp.setOption("mgridSweeps", &mgridSweeps, "number of multigrid sweeps within Multigrid solver.");
+      std::string printTimings = "no";
+      clp.setOption("timings", &printTimings, "print timings to screen [yes/no]");
+      double tol = 1e-12;
+      clp.setOption("tol", &tol, "solver convergence tolerance");
 
-      switch (clp.parse(argc,argv)) {
-        case Teuchos::CommandLineProcessor::PARSE_HELP_PRINTED:        return EXIT_SUCCESS; break;
+      switch (clp.parse(argc, argv)) {
+        case Teuchos::CommandLineProcessor::PARSE_HELP_PRINTED: return EXIT_SUCCESS; break;
         case Teuchos::CommandLineProcessor::PARSE_ERROR:
         case Teuchos::CommandLineProcessor::PARSE_UNRECOGNIZED_OPTION: return EXIT_FAILURE; break;
-        case Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL:                               break;
+        case Teuchos::CommandLineProcessor::PARSE_SUCCESSFUL: break;
       }
 
       // ================================
       // Validation of input parameters
       // ================================
-      TEUCHOS_TEST_FOR_EXCEPTION(xmlFileName=="", std::runtime_error,
-          "You need to specify the xml-file via the command line argument '--xml=<path/to/xml_file>'.");
+      TEUCHOS_TEST_FOR_EXCEPTION(xmlFileName == "", std::runtime_error,
+                                 "You need to specify the xml-file via the command line argument '--xml=<path/to/xml_file>'.");
 
       // ================================
       // Problem construction
@@ -169,16 +173,16 @@ int main (int argc, char *argv[])
       galeriList.set("my", 1);
 
       // Create node map (equals dof map, since one dof per node)
-      RCP<const Xpetra::Map<LO, GO, NO>> xpetra_map = Galeri::Xpetra::CreateMap<LO,GO,NO>(Xpetra::UseTpetra, "Cartesian2D", comm, galeriList);
-      RCP<const Map> nodeMap = Xpetra::toTpetra(xpetra_map);
-      RCP<const Map> dofMap = nodeMap;
+      RCP<const Xpetra::Map<LO, GO, NO>> xpetra_map = Galeri::Xpetra::CreateMap<LO, GO, NO>(Xpetra::UseTpetra, "Cartesian2D", comm, galeriList);
+      RCP<const Map> nodeMap                        = Xpetra::toTpetra(xpetra_map);
+      RCP<const Map> dofMap                         = nodeMap;
 
       // Create coordinates
-      RCP<const RealValuedMultiVector> coordinates = Galeri::Xpetra::Utils::CreateCartesianCoordinates<SC,LO,GO,Map,RealValuedMultiVector>("2D", nodeMap, galeriList);
+      RCP<const RealValuedMultiVector> coordinates = Galeri::Xpetra::Utils::CreateCartesianCoordinates<SC, LO, GO, Map, RealValuedMultiVector>("2D", nodeMap, galeriList);
 
       // Create the matrix
-      RCP<Galeri::Xpetra::Problem<Map,CrsMatrix,MultiVector>> galeriProblem =
-          Galeri::Xpetra::BuildProblem<SC,LO,GO,Map,CrsMatrix,MultiVector>("Laplace2D", dofMap, galeriList);
+      RCP<Galeri::Xpetra::Problem<Map, CrsMatrix, MultiVector>> galeriProblem =
+          Galeri::Xpetra::BuildProblem<SC, LO, GO, Map, CrsMatrix, MultiVector>("Laplace2D", dofMap, galeriList);
       RCP<CrsMatrix> matrix = galeriProblem->BuildMatrix();
 
       // Some safety checks to see, if Galeri delivered valid output
@@ -192,7 +196,7 @@ int main (int argc, char *argv[])
       RCP<MultiVector> B = rcp(new MultiVector(dofMap, 1, true));
       B->putScalar(one);
 
-      // Initilize solution vector with random values
+      // Initialize solution vector with random values
       RCP<MultiVector> X = rcp(new MultiVector(dofMap, 1, true));
       STS::seedrandom(100);
       X->randomize();
@@ -210,7 +214,7 @@ int main (int argc, char *argv[])
 
       //! [ReadMueLuParamsFromXmlFile begin]
       // Read MueLu parameter list from xml file
-      RCP<ParameterList> mueluParams =  Teuchos::getParametersFromXmlFile(xmlFileName);
+      RCP<ParameterList> mueluParams = Teuchos::getParametersFromXmlFile(xmlFileName);
       //! [ReadMueLuParamsFromXmlFile end]
 
       //! [InsertNullspaceInUserData begin]
@@ -221,7 +225,7 @@ int main (int argc, char *argv[])
 
       //! [CreateTpetraPreconditioner begin]
       // Create the MueLu preconditioner based on the Tpetra stack
-      RCP<MueLu::TpetraOperator<SC,LO,GO,NO>> mueLuPreconditioner =
+      RCP<MueLu::TpetraOperator<SC, LO, GO, NO>> mueLuPreconditioner =
           MueLu::CreateTpetraPreconditioner(Teuchos::rcp_dynamic_cast<Operator>(matrix), *mueluParams);
       //! [CreateTpetraPreconditioner end]
 
@@ -232,7 +236,7 @@ int main (int argc, char *argv[])
       {
         exactSolution->update(0.0, *X, 1.0);
 
-        RCP<Amesos2::Solver<CrsMatrix,MultiVector>> directSolver = Amesos2::create<CrsMatrix,MultiVector>("KLU2", matrix, X, B);
+        RCP<Amesos2::Solver<CrsMatrix, MultiVector>> directSolver = Amesos2::create<CrsMatrix, MultiVector>("KLU2", matrix, X, B);
         directSolver->solve();
       }
 
@@ -246,8 +250,8 @@ int main (int argc, char *argv[])
 
         //! [MueLuAsPrecSetupLinearSystem begin]
         // Construct a Belos LinearProblem object and hand-in the MueLu preconditioner
-        RCP<Belos::LinearProblem<SC,MultiVector,Operator>> belosProblem =
-            rcp(new Belos::LinearProblem<SC,MultiVector,Operator>(matrix, precSolVec, B));
+        RCP<Belos::LinearProblem<SC, MultiVector, Operator>> belosProblem =
+            rcp(new Belos::LinearProblem<SC, MultiVector, Operator>(matrix, precSolVec, B));
         belosProblem->setLeftPrec(mueLuPreconditioner);
         bool set = belosProblem->setProblem();
         //! [MueLuAsPrecSetupLinearSystem end]
@@ -260,15 +264,15 @@ int main (int argc, char *argv[])
         //! [MueLuAsPrecConfigureAndCreateBelosSolver begin]
         // Belos parameter list
         RCP<ParameterList> belosList = Teuchos::parameterList();
-        belosList->set("Maximum Iterations", 50); // Maximum number of iterations allowed
-        belosList->set("Convergence Tolerance", tol); // Relative convergence tolerance requested
+        belosList->set("Maximum Iterations", 50);      // Maximum number of iterations allowed
+        belosList->set("Convergence Tolerance", tol);  // Relative convergence tolerance requested
         belosList->set("Verbosity", Belos::Errors + Belos::Warnings + Belos::StatusTestDetails);
         belosList->set("Output Frequency", 1);
         belosList->set("Output Style", Belos::Brief);
 
         // Create an iterative solver manager
-        Belos::SolverFactory<SC,MultiVector,Operator> solverFactory;
-        RCP<Belos::SolverManager<SC,MultiVector,Operator>> solver = solverFactory.create("Block GMRES", belosList);
+        Belos::SolverFactory<SC, MultiVector, Operator> solverFactory;
+        RCP<Belos::SolverManager<SC, MultiVector, Operator>> solver = solverFactory.create("Block GMRES", belosList);
 
         // Pass the linear problem to the solver
         solver->setProblem(belosProblem);
@@ -277,7 +281,7 @@ int main (int argc, char *argv[])
         //! [MueLuAsPrecSolve begin]
         // Perform solve
         Belos::ReturnType retStatus = Belos::Unconverged;
-        retStatus = solver->solve();
+        retStatus                   = solver->solve();
         //! [MueLuAsPrecSolve end]
 
         // Get the number of iterations for this solve
@@ -285,9 +289,11 @@ int main (int argc, char *argv[])
 
         // Check convergence status
         if (retStatus != Belos::Converged)
-          fancyout << std::endl << "ERROR:  Belos did not converge! " << std::endl;
+          fancyout << std::endl
+                   << "ERROR:  Belos did not converge! " << std::endl;
         else
-          fancyout << std::endl << "SUCCESS:  Belos converged!" << std::endl;
+          fancyout << std::endl
+                   << "SUCCESS:  Belos converged!" << std::endl;
       }
 
       // Solve Ax = b using AMG as a solver
@@ -300,7 +306,7 @@ int main (int argc, char *argv[])
 
         //! [ExtractHierarchyFromTpetraPrec begin]
         // Extract the underlying MueLu hierarchy
-        RCP<MueLu::Hierarchy<SC,LO,GO,NO>> hierarchy = mueLuPreconditioner->GetHierarchy();
+        RCP<MueLu::Hierarchy<SC, LO, GO, NO>> hierarchy = mueLuPreconditioner->GetHierarchy();
         //! [ExtractHierarchyFromTpetraPrec end]
 
         //! [MueLuAsSolverSetSolverMode begin]
@@ -314,10 +320,10 @@ int main (int argc, char *argv[])
         //! [MueLuAsSolverIterate end]
       }
 
-    } // end of Tpetra::ScopeGuard
-  success = true;
+    }  // end of Tpetra::ScopeGuard
+    success = true;
   }
   TEUCHOS_STANDARD_CATCH_STATEMENTS(true, std::cerr, success);
 
-  return ( success ? EXIT_SUCCESS : EXIT_FAILURE );
-} // main
+  return (success ? EXIT_SUCCESS : EXIT_FAILURE);
+}  // main
