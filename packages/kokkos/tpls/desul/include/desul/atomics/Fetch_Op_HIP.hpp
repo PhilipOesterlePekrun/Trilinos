@@ -43,9 +43,8 @@ DESUL_IMPL_HIP_ATOMIC_FETCH_OP_INTEGRAL(and)
 DESUL_IMPL_HIP_ATOMIC_FETCH_OP_INTEGRAL(or)
 DESUL_IMPL_HIP_ATOMIC_FETCH_OP_INTEGRAL(xor)
 DESUL_IMPL_HIP_ATOMIC_FETCH_OP_FLOATING_POINT(add)
-// atomic min/max gives the wrong results (tested with ROCm 6.0 on Frontier)
-// DESUL_IMPL_HIP_ATOMIC_FETCH_OP_FLOATING_POINT(min)
-// DESUL_IMPL_HIP_ATOMIC_FETCH_OP_FLOATING_POINT(max)
+DESUL_IMPL_HIP_ATOMIC_FETCH_OP_FLOATING_POINT(min)
+DESUL_IMPL_HIP_ATOMIC_FETCH_OP_FLOATING_POINT(max)
 
 #undef DESUL_IMPL_HIP_ATOMIC_FETCH_OP_FLOATING_POINT
 #undef DESUL_IMPL_HIP_ATOMIC_FETCH_OP_INTEGRAL
@@ -117,6 +116,32 @@ DESUL_IMPL_HIP_ATOMIC_FETCH_INC_MOD(MemoryScopeNode, "")
 DESUL_IMPL_HIP_ATOMIC_FETCH_INC_MOD(MemoryScopeSystem, "")
 
 #undef DESUL_IMPL_HIP_ATOMIC_FETCH_INC_MOD
+
+#define DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(T)                                           \
+  template <class MemoryOrder, class MemoryScope>                                     \
+  __device__ inline T device_atomic_load(T* ptr, MemoryOrder, MemoryScope) {          \
+    return __hip_atomic_load(                                                         \
+        ptr, HIPMemoryOrder<MemoryOrder>::value, HIPMemoryScope<MemoryScope>::value); \
+  }                                                                                   \
+  template <class MemoryOrder, class MemoryScope>                                     \
+  __device__ inline void device_atomic_store(                                         \
+      T* ptr, T val, MemoryOrder, MemoryScope) {                                      \
+    return __hip_atomic_store(ptr,                                                    \
+                              val,                                                    \
+                              HIPMemoryOrder<MemoryOrder>::value,                     \
+                              HIPMemoryScope<MemoryScope>::value);                    \
+  }
+
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(int)
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(long)
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(long long)
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(unsigned int)
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(unsigned long)
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(unsigned long long)
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(float)
+DESUL_IMPL_HIP_ATOMIC_LOAD_STORE(double)
+
+#undef DESUL_IMPL_HIP_ATOMIC_LOAD_STORE
 
 }  // namespace Impl
 }  // namespace desul

@@ -962,7 +962,7 @@ endfunction()
 #       FLAGS       --> flags to check
 #
 function(kokkos_check_flags)
-  cmake_parse_arguments(INP "COMPILER;LINKER" "LANGUAGE" "FLAGS" ${ARGN})
+  cmake_parse_arguments(INP "COMPILER;LINKER" "LANGUAGE" "FLAGS;LINKER_FLAGS" ${ARGN})
 
   # do nothing if no flags are given
   if(NOT INP_FLAGS)
@@ -982,10 +982,15 @@ function(kokkos_check_flags)
     include(CheckCompilerFlag)
     #delete cache so we always do the check
     unset(KOKKOS_COMPILE_OPTIONS_CHECK CACHE)
+    if(INP_LINKER_FLAGS)
+      # icpx adds "-device ..." options that need quotes (which CMake removes). We need to add them here again.
+      string(REGEX REPLACE "(-device [A-Za-z0-9_\\\\.]*)" "\"\\1\"" QUOTED_LINKER_FLAGS "${INP_LINKER_FLAGS}")
+      set(CMAKE_REQUIRED_LINK_OPTIONS "${QUOTED_LINKER_FLAGS}")
+    endif()
     check_compiler_flag(${INP_LANGUAGE} "${QUOTED_FLAGS}" KOKKOS_COMPILE_OPTIONS_CHECK)
     if(NOT KOKKOS_COMPILE_OPTIONS_CHECK)
       message(
-        FATAL_ERROR
+        WARNING
           "The compiler for ${KOKKOS_COMPILE_LANGUAGE} can not consume flag(s) ${QUOTED_FLAGS} in combination with the CMAKE_${KOKKOS_COMPILE_LANGUAGE}_FLAGS=${CMAKE_${KOKKOS_COMPILE_LANGUAGE}_FLAGS}. Please check the given configuration."
       )
     endif()
@@ -1000,7 +1005,7 @@ function(kokkos_check_flags)
     check_linker_flag(${INP_LANGUAGE} "${QUOTED_FLAGS}" KOKKOS_LINK_OPTIONS_CHECK)
     if(NOT KOKKOS_LINK_OPTIONS_CHECK)
       message(
-        FATAL_ERROR
+        WARNING
           "The linker for ${KOKKOS_COMPILE_LANGUAGE} can not consume flag(s) ${QUOTED_FLAGS}. Please check the given configuration."
       )
     endif()

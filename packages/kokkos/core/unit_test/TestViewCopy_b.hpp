@@ -1,24 +1,16 @@
-//@HEADER
-// ************************************************************************
-//
-//                        Kokkos v. 4.0
-//       Copyright (2022) National Technology & Engineering
-//               Solutions of Sandia, LLC (NTESS).
-//
-// Under the terms of Contract DE-NA0003525 with NTESS,
-// the U.S. Government retains certain rights in this software.
-//
-// Part of Kokkos, under the Apache License v2.0 with LLVM Exceptions.
-// See https://kokkos.org/LICENSE for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//@HEADER
+// SPDX-FileCopyrightText: Copyright Contributors to the Kokkos project
 
 #include <cstdio>
 
 #include <gtest/gtest.h>
 
+#include <Kokkos_Macros.hpp>
+#ifdef KOKKOS_ENABLE_EXPERIMENTAL_CXX20_MODULES
+import kokkos.core;
+#else
 #include <Kokkos_Core.hpp>
+#endif
 
 namespace Test {
 
@@ -61,17 +53,12 @@ TEST(TEST_CATEGORY, view_copy_tests_rank_0) {
   auto host = Kokkos::DefaultHostExecutionSpace();
 
   // No execution space
-  { Kokkos::deep_copy(defaulted, defaulted); }
   {
     Kokkos::deep_copy(a, 0);
     ASSERT_TRUE(run_check(a, 0));
   }
   {
     Kokkos::deep_copy(a, 1);
-    ASSERT_TRUE(run_check(a, 1));
-  }
-  {
-    Kokkos::deep_copy(a, a);
     ASSERT_TRUE(run_check(a, 1));
   }
   {
@@ -112,17 +99,12 @@ TEST(TEST_CATEGORY, view_copy_tests_rank_0) {
   }
 
   // Device
-  { Kokkos::deep_copy(dev, defaulted, defaulted); }
   {
     Kokkos::deep_copy(dev, a, 0);
     ASSERT_TRUE(run_check(a, 0));
   }
   {
     Kokkos::deep_copy(dev, a, 1);
-    ASSERT_TRUE(run_check(a, 1));
-  }
-  {
-    Kokkos::deep_copy(dev, a, a);
     ASSERT_TRUE(run_check(a, 1));
   }
   {
@@ -163,17 +145,12 @@ TEST(TEST_CATEGORY, view_copy_tests_rank_0) {
   }
 
   // Host
-  { Kokkos::deep_copy(host, defaulted, defaulted); }
   {
     Kokkos::deep_copy(host, a, 0);
     ASSERT_TRUE(run_check(a, 0));
   }
   {
     Kokkos::deep_copy(host, a, 1);
-    ASSERT_TRUE(run_check(a, 1));
-  }
-  {
-    Kokkos::deep_copy(host, a, a);
     ASSERT_TRUE(run_check(a, 1));
   }
   {
