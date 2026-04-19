@@ -1,18 +1,5 @@
-#@HEADER
-# ************************************************************************
-#
-#                        Kokkos v. 4.0
-#       Copyright (2022) National Technology & Engineering
-#               Solutions of Sandia, LLC (NTESS).
-#
-# Under the terms of Contract DE-NA0003525 with NTESS,
-# the U.S. Government retains certain rights in this software.
-#
-# Part of Kokkos, under the Apache License v2.0 with LLVM Exceptions.
-# See https://kokkos.org/LICENSE for license information.
+# SPDX-FileCopyrightText: Copyright Contributors to the Kokkos project
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
-#@HEADER
 
 """Check if an API change in Kokkos Kernels might be undocumented
 
@@ -37,6 +24,8 @@ src_directories = ["batched/dense/src",
                    "sparse/src"]
 
 src_doc_mapping = dict([
+                        ('batched/dense/src/KokkosBatched_ApplyHouseholder_Decl.hpp', ['docs/source/API/batched/dense/batched_apply_householder.rst']),
+                        ('batched/dense/src/KokkosBatched_Householder_Decl.hpp', ['docs/source/API/batched/dense/batched_householder.rst']),
                         ('blas/src/KokkosBlas1_abs.hpp', ['blas1_abs.rst']),
                         ('blas/src/KokkosBlas1_axpby.hpp', ['blas1_axpy.rst']),
                         ('blas/src/KokkosBlas1_dot.hpp', ['blas1_dot.rst']),
@@ -55,7 +44,7 @@ src_doc_mapping = dict([
                         ('blas/src/KokkosBlas1_rotm.hpp', ['blas1_rotm.rst']),
                         ('blas/src/KokkosBlas1_rotmg.hpp', ['blas1_rotmg.rst']),
                         ('blas/src/KokkosBlas1_scal.hpp', ['blas1_scal.rst']),
-                        # ('blas/src/KokkosBlas1_set.hpp', ['']),
+                        ('blas/src/KokkosBlas1_set.hpp', ['blas1_set.rst']),
                         # ('blas/src/KokkosBlas1_sum.hpp', ['']),
                         ('blas/src/KokkosBlas1_swap.hpp', ['blas1_swap.rst']),
                         # ('blas/src/KokkosBlas1_update.hpp', ['']),
@@ -66,11 +55,14 @@ src_doc_mapping = dict([
                         ('blas/src/KokkosBlas3_gemm.hpp', ['blas3_gemm.rst']),
                         ('blas/src/KokkosBlas3_trmm.hpp', ['blas3_trmm.rst']),
                         ('blas/src/KokkosBlas3_trsm.hpp', ['blas3_trsm.rst']),
+                        ('lapack/src/KokkosLapack_geqrf.hpp', ['docs/source/API/lapack/geqrf.rst']),
+                        ('lapack/src/KokkosLapack_potrf.hpp', ['docs/source/API/lapack/potrf.rst']),
                         ('lapack/src/KokkosLapack_gesv.hpp', ['docs/source/API/lapack/gesv.rst']),
                         ('lapack/src/KokkosLapack_svd.hpp', ['docs/source/API/lapack/gesvd.rst']),
                         ('lapack/src/KokkosLapack_trtri.hpp', ['docs/source/API/lapack/trtri.rst']),
                         ('graph/src/KokkosGraph_Distance1Color.hpp', ['docs/source/API/graph/distance1_color.rst']),
                         ('graph/src/KokkosGraph_Distance2Color.hpp', ['docs/source/API/graph/distance2_color.rst']),
+                        ('graph/src/KokkosGraph_RCB.hpp', ['docs/source/API/graph/rcb.rst']),
                         ('sparse/src/KokkosKernels_Handle.hpp', ['docs/source/API/sparse/kokkoskernelshandle.rst',
                                                                  'docs/source/API/sparse/handle_get_create_destroy.rst']),
                         ('sparse/src/KokkosSparse_BsrMatrix.hpp', ['docs/source/API/sparse/bsr_matrix.rst',
@@ -79,6 +71,10 @@ src_doc_mapping = dict([
                         ('sparse/src/KokkosSparse_CrsMatrix.hpp', ['docs/source/API/sparse/crs_matrix.rst',
                                                                    'docs/source/API/sparse/CrsMatrix_constructors.rst',
                                                                    'docs/source/API/sparse/sparse_row_view.rst']),
+                        ('sparse/src/KokkosSparse_CcsMatrix.hpp', ['docs/source/API/sparse/ccs_matrix.rst',
+                                                                   'docs/source/API/sparse/CcsMatrix_constructors.rst']),
+                        ('sparse/src/KokkosSparse_CooMatrix.hpp', ['docs/source/API/sparse/coo_matrix.rst',
+                                                                   'docs/source/API/sparse/CooMatrix_constructors.rst']),
                         # ('sparse/src/KokkosSparse_CcsMatrix.hpp', ['']),
                         # ('sparse/src/KokkosSparse_CooMatrix.hpp', ['']),
                         # ('sparse/src/KokkosSparse_IOUtils.hpp', []),
@@ -86,10 +82,11 @@ src_doc_mapping = dict([
                         # ('sparse/src/KokkosSparse_MatrixPrec.hpp', []),
                         # ('sparse/src/KokkosSparse_OrdinalTraits.hpp', []),
                         # ('sparse/src/KokkosSparse_Preconditioner.hpp', []),
-                        # ('sparse/src/KokkosSparse_SortCrs.hpp', []),
+                        ('sparse/src/KokkosSparse_SortCrs.hpp', ['docs/source/API/sparse/sort_crs.rst']),
                         # ('sparse/src/KokkosSparse_StaticCcsGraph.hpp', []),
                         # ('sparse/src/KokkosSparse_StaticCrsGraph.hpp', []),
-                        # ('sparse/src/KokkosSparse_Utils.hpp', []),
+                        ('sparse/src/KokkosSparse_Utils.hpp', ['docs/source/API/sparse/extract_diagonal_blocks_rcb_deprecated.rst',
+                                                               'docs/source/API/sparse/extract_diagonal_blocks_rcb.rst']),
                         # ('sparse/src/KokkosSparse_Utils_cusparse.hpp', []),
                         # ('sparse/src/KokkosSparse_Utils_mkl.hpp', []),
                         # ('sparse/src/KokkosSparse_Utils_rocsparse.hpp', []),

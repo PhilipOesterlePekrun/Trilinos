@@ -5,6 +5,8 @@ API: LAPACK
    :maxdepth: 2
    :hidden:
 
+   lapack/geqrf
+   lapack/potrf
    lapack/gesv
    lapack/gesvd
    lapack/trtri
@@ -13,13 +15,13 @@ API: LAPACK
 LAPACK support
 ==============
 
-Below are tables summarizing the currently supported function calls and third party libraries in Kokkos Kernels. The tables are updated with each release of the library to reflect recently added support.
+Below are tables summarizing the currently supported function calls and third party libraries in Kokkos Kernels.
 
 .. list-table::
    :widths: 12 26 10 10 10 10 10
    :header-rows: 1
 
-   * - BLAS Call
+   * - LAPACK Call
      - API Call
      - Reference
      - BLAS
@@ -69,12 +71,19 @@ Below are tables summarizing the currently supported function calls and third pa
      - 
      - 
    * - geqrf
+     - :doc:`geqrf <lapack/geqrf>`
      - 
      - 
      - 
      - 
-     - 
-     - 
+     -
+   * - potrf
+     - :doc:`potrf <lapack/potrf>`
+     - --
+     - X
+     - X
+     - X
+     - --
    * - ungqr
      - 
      - 
